@@ -3,9 +3,7 @@ package com.codex.pestcontrol.core;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.EnumMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * One Pest Control game as the Pilot follows it: which shields are down, which portals have
@@ -18,18 +16,34 @@ public class Battle
 	public static final int DAMAGE_FOR_POINTS = 50;
 	/** A portal this many tiles nearer than the weakest open one is worth going to first. */
 	private static final int NEARER_BY = 15;
+	/** Until you have your points, an open portal with this many fewer players is worth going to. */
+	private static final int QUIETER_BY = 6;
+	/** Below this activity, waiting time is better spent on a barricade. */
+	private static final int LOW_ACTIVITY = 30;
 
 	private final boolean[] shielded = {true, true, true, true};
 	private final boolean[] fallen = new boolean[4];
 	private final int[] health = {-1, -1, -1, -1};
 	private final List<Portal> drops = new ArrayList<>();
+	private final List<Integer> dropTicks = new ArrayList<>();
 	private List<Rotation> possible = new ArrayList<>(Arrays.asList(Rotation.values()));
 	private int knightHealth = -1;
 	private int damage;
 	private int ticks;
 
-	/** A portal's shield has dropped, by its message or by the portal changing. Repeats are ignored. */
+	/** A portal's shield has dropped just now, by its message or by the portal changing. Repeats are ignored. */
 	public void shieldDropped(Portal portal)
+	{
+		drop(portal, ticks);
+	}
+
+	/** A portal found already open, so the moment its shield dropped is not known. */
+	public void foundOpen(Portal portal)
+	{
+		drop(portal, -1);
+	}
+
+	private void drop(Portal portal, int at)
 	{
 		if (portal == null || !shielded[portal.ordinal()])
 		{
@@ -38,6 +52,7 @@ public class Battle
 		shielded[portal.ordinal()] = false;
 		int step = drops.size();
 		drops.add(portal);
+		dropTicks.add(at);
 		List<Rotation> left = new ArrayList<>();
 		for (Rotation r : possible)
 		{
@@ -66,8 +81,8 @@ public class Battle
 	public void fall(Portal portal)
 	{
 		fallen[portal.ordinal()] = true;
-		// A portal can only be killed with its shield down.
-		shieldDropped(portal);
+		// A portal can only be killed with its shield down; when its drop was missed, its moment is unknown.
+		foundOpen(portal);
 	}
 
 	public void setKnightHealth(int hp)
@@ -122,6 +137,42 @@ public class Battle
 	public List<Portal> getDrops()
 	{
 		return Collections.unmodifiableList(drops);
+	}
+
+	/** The tick each shield dropped on, in drop order, -1 where it was not seen. */
+	public List<Integer> getDropTicks()
+	{
+		return Collections.unmodifiableList(dropTicks);
+	}
+
+	/** Seconds until the next shield is due by the clock learned so far, or -1 when not known. */
+	public int secondsToNextDrop(ShieldClock clock)
+	{
+		int step = drops.size();
+		if (step >= 4 || clock == null)
+		{
+			return -1;
+		}
+		int gap = clock.expected(step);
+		if (gap < 0)
+		{
+			return -1;
+		}
+		int since;
+		if (step == 0)
+		{
+			since = ticks;
+		}
+		else
+		{
+			int last = dropTicks.get(step - 1);
+			if (last < 0)
+			{
+				return -1;
+			}
+			since = ticks - last;
+		}
+		return (int) Math.max(0, Math.round((gap - since) * 0.6));
 	}
 
 	public List<Rotation> getPossible()
@@ -180,18 +231,11 @@ public class Battle
 		return damage >= DAMAGE_FOR_POINTS;
 	}
 
-	/**
-	 * What to do now.
-	 *
-	 * @param distance tiles from you to each portal you can see, missing when not known
-	 * @param spinners spinners near each portal, healing it
-	 * @param knightWarn the knight's health at or below which defending him comes first
-	 */
-	public Advice advise(Map<Portal, Integer> distance, Map<Portal, Integer> spinners, int knightWarn)
+	/** What to do now, from the status bar and what can be seen around the island. */
+	public Advice advise(Field field)
 	{
-		Map<Portal, Integer> far = distance == null ? new EnumMap<>(Portal.class) : distance;
-		Map<Portal, Integer> heal = spinners == null ? new EnumMap<>(Portal.class) : spinners;
-		boolean knightLow = knightHealth >= 0 && knightWarn > 0 && knightHealth <= knightWarn;
+		Field f = field == null ? new Field() : field;
+		boolean knightLow = knightHealth >= 0 && f.knightWarn > 0 && knightHealth <= f.knightWarn;
 
 		List<Portal> open = new ArrayList<>();
 		List<Portal> standing = new ArrayList<>();
@@ -213,21 +257,10 @@ public class Battle
 
 		if (!open.isEmpty())
 		{
-			Portal target = pick(open, far);
-			String detail;
-			int spinning = heal.getOrDefault(target, 0);
-			if (spinning > 0)
-			{
-				detail = spinning == 1 ? "A spinner is healing it: kill it first" : spinning + " spinners are healing it: kill them first";
-			}
-			else if (health[target.ordinal()] > 0)
-			{
-				detail = "Shield down, " + health[target.ordinal()] + " health left";
-			}
-			else
-			{
-				detail = "Shield down: leave by the " + target.getGate();
-			}
+			Portal weakest = weakest(open);
+			Portal target = pick(open, weakest, f);
+			boolean quieter = target != weakest && quieter(target, weakest, f);
+			String detail = attackDetail(target, quieter, f);
 			if (knightLow)
 			{
 				detail = "Knight at " + knightHealth + " health. " + detail;
@@ -241,22 +274,71 @@ public class Battle
 				"He is at " + knightHealth + " health and no shield is down: clear the pests around him");
 		}
 
+		String when = f.nextDrop < 0 ? "next" : f.nextDrop <= 3 ? "any moment" : "in about " + f.nextDrop + "s";
+		boolean idle = f.activity >= 0 && f.activity < LOW_ACTIVITY;
 		List<Portal> next = nextShields();
 		if (next.size() == 1)
 		{
 			Portal p = next.get(0);
-			return new Advice(Advice.Kind.NEXT, p, next, "Head to " + p.getTitle() + " (" + p.getSide() + ")",
-				"Its shield drops next: leave by the " + p.getGate());
+			String detail = "Its shield drops " + when + ": leave by the " + p.getGate();
+			if (f.style.isDistant())
+			{
+				detail += ". Hang back and hit it from range";
+			}
+			return new Advice(Advice.Kind.NEXT, p, next, "Head to " + p.getTitle() + " (" + p.getSide() + ")", detail);
 		}
 		if (next.isEmpty())
 		{
 			next = standing;
 		}
-		return new Advice(Advice.Kind.WAIT, null, next, "Hold by the knight", list(next) + " drops next");
+		String detail = list(next) + " drops " + when;
+		if (idle)
+		{
+			detail += ". Repair a barricade meanwhile to raise your activity";
+		}
+		return new Advice(Advice.Kind.WAIT, null, next, "Hold by the knight", detail);
 	}
 
-	/** The weakest open portal, unless another is a good deal nearer. */
-	private Portal pick(List<Portal> open, Map<Portal, Integer> far)
+	/** What to say about the portal to attack: what stands in the way first, then why this one. */
+	private String attackDetail(Portal target, boolean quieter, Field f)
+	{
+		int spinning = f.spinners.getOrDefault(target, 0);
+		if (spinning > 0)
+		{
+			if (f.style.isDistant())
+			{
+				return spinning == 1 ? "A spinner is healing it: shoot it from range, then the portal"
+					: spinning + " spinners are healing it: shoot them from range, then the portal";
+			}
+			return spinning == 1 ? "A spinner is healing it: kill it first" : spinning + " spinners are healing it: kill them first";
+		}
+		int brawling = f.brawlers.getOrDefault(target, 0);
+		if (brawling > 0 && !f.style.isDistant())
+		{
+			return brawling == 1 ? "A brawler blocks the way: clear it first" : brawling + " brawlers block the way: clear them first";
+		}
+		Integer crowd = f.crowdAt(target);
+		if (quieter && crowd != null)
+		{
+			return crowd == 0 ? "Nobody is there yet: easy damage for your points" : "Only " + players(crowd) + " there: easier damage for your points";
+		}
+		StringBuilder sb = new StringBuilder("Shield down");
+		if (health[target.ordinal()] > 0)
+		{
+			sb.append(", ").append(health[target.ordinal()]).append(" health left");
+		}
+		else
+		{
+			sb.append(": leave by the ").append(target.getGate());
+		}
+		if (crowd != null && crowd > 0)
+		{
+			sb.append(", ").append(players(crowd));
+		}
+		return sb.toString();
+	}
+
+	private Portal weakest(List<Portal> open)
 	{
 		Portal weakest = open.get(0);
 		for (Portal p : open)
@@ -266,23 +348,62 @@ public class Battle
 				weakest = p;
 			}
 		}
+		return weakest;
+	}
+
+	/**
+	 * The weakest open portal, unless you still need damage for points and another has far
+	 * fewer players to share it with, or another is a good deal nearer.
+	 */
+	private Portal pick(List<Portal> open, Portal weakest, Field f)
+	{
+		if (!hasPoints())
+		{
+			Portal quietest = weakest;
+			for (Portal p : open)
+			{
+				Integer c = f.crowd.get(p);
+				Integer best = f.crowd.get(quietest);
+				if (c != null && best != null && c < best)
+				{
+					quietest = p;
+				}
+			}
+			if (quietest != weakest && quieter(quietest, weakest, f))
+			{
+				return quietest;
+			}
+		}
 		Portal nearest = weakest;
 		for (Portal p : open)
 		{
-			Integer d = far.get(p);
-			Integer best = far.get(nearest);
+			Integer d = f.distance.get(p);
+			Integer best = f.distance.get(nearest);
 			if (d != null && (best == null || d < best))
 			{
 				nearest = p;
 			}
 		}
-		Integer dw = far.get(weakest);
-		Integer dn = far.get(nearest);
+		Integer dw = f.distance.get(weakest);
+		Integer dn = f.distance.get(nearest);
 		if (nearest != weakest && dn != null && (dw == null || dw - dn >= NEARER_BY))
 		{
 			return nearest;
 		}
 		return weakest;
+	}
+
+	private static boolean quieter(Portal a, Portal than, Field f)
+	{
+		Integer ca = f.crowd.get(a);
+		Integer cb = f.crowd.get(than);
+		return ca != null && cb != null && cb - ca >= QUIETER_BY;
+	}
+
+	/** "1 player", "12 players". */
+	static String players(int n)
+	{
+		return n + (n == 1 ? " player" : " players");
 	}
 
 	private static int rank(int hp)

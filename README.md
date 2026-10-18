@@ -14,8 +14,11 @@ Guidance only: the Pilot never clicks, moves or attacks for you.
 
 ## What it does
 
-- **Work next.** One line that says what to do now. When a shield is down: attack that portal, the weakest one if several are open unless another is a good deal nearer, and kill the spinners first when they are healing it. When no shield is down but the order is known: head for the portal whose shield drops next, and which gate to leave by. Before that: hold by the knight, with the portals that could drop next. When the Void Knight is low and nothing is open: defend him.
+- **Work next.** One line that says what to do now. When a shield is down: attack that portal, the weakest one if several are open unless another is a good deal nearer, and kill the spinners first when they are healing it (from range if you fight with a bow or staff) or clear the brawlers in a melee fighter's way. When no shield is down but the order is known: head for the portal whose shield drops next, and which gate to leave by. Before that: hold by the knight, with the portals that could drop next. When the Void Knight is low and nothing is open: defend him.
 - **The island, charted.** The Battle tab draws the outpost with its west, east and south gates and the four portals where they stand. Open portals glow, shielded ones sit behind a pale ring, fallen ones go grey, each shows its health, and they are numbered in the order their shields drop. The one to work wears a gold halo, with the way there traced from the knight through the right gate.
+- **Reading the team.** Players are counted at every portal. Until you have your points, the Pilot sends you to the open portal with far fewer players, where your hits land instead of being shared out among a crowd.
+- **Shield countdown.** The Pilot learns from your own games how long each shield takes to drop and counts down to the next one, so you are standing at the portal when it opens.
+- **Activity.** The game's own activity bar is read alongside your damage, and while you wait for a shield with a low bar the Pilot suggests repairing a barricade.
 - **Reading the rotation.** Shields always drop in one of six orders. After the first one or two drops the Pilot knows the rest of the game and sends you ahead of the crowd.
 - **Marked in the world.** The portal to work gets an outline in its colour, a gilt ring on its tile, a word over it and a ring on the minimap. While the next drop is still open, every candidate gets a faint outline.
 - **Damage for points.** A game only gives points once you have dealt 50 damage. The plaque and the panel count yours, so you know when you have done enough.
@@ -37,7 +40,7 @@ Guidance only: the Pilot never clicks, moves or attacks for you.
 
 ## How it reads a game
 
-The game's own status bar gives each portal's health and the knight's. Shields are read from the portals themselves and from the "portal shield has dropped" messages, and each drop rules out the rotations that do not start that way. Your damage is the sum of your own hitsplats on anything in the game. Your points are read from the lander when you board one and from the message at the end of each game.
+The game's own status bar gives each portal's health, the knight's and your activity. Shields are read from the portals themselves and from the "portal shield has dropped" messages, and each drop rules out the rotations that do not start that way. Your damage is the sum of your own hitsplats on anything in the game. Your style comes from the weapon you hold, and the crowd at a portal is the other players within ten tiles of it. Your points are read from the lander when you board one and from the message at the end of each game.
 
 Everything is kept per account in RuneLite's profile settings, nothing leaves your computer.
 

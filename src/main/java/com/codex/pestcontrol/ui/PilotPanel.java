@@ -238,7 +238,8 @@ public class PilotPanel extends PluginPanel
 		tiles.add(new StatTile(f.knightHealth < 0 ? "-" : String.valueOf(f.knightHealth), "Knight", "health", knight));
 		boolean points = f.damage >= Battle.DAMAGE_FOR_POINTS;
 		tiles.add(new StatTile(String.valueOf(f.damage), "Damage", points ? "points earned" : "of " + Battle.DAMAGE_FOR_POINTS, points ? Theme.GREEN : Theme.EMBER));
-		tiles.add(new StatTile(Format.clock(f.seconds), "Time", "this game", Theme.GOLD));
+		Color active = f.activity < 0 ? Theme.TEXT_MUTED : f.activity < 30 ? Theme.EMBER : f.activity < 60 ? Theme.GOLD : Theme.GREEN;
+		tiles.add(new StatTile(f.activity < 0 ? "-" : f.activity + "%", "Activity", "zeal bar", active));
 		stack.add(tiles);
 		if (!points)
 		{

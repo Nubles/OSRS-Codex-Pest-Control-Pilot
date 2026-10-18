@@ -22,6 +22,8 @@ public class PilotPlaque extends Overlay
 	private static final int PAD = 8;
 	private static final int ICON = 22;
 	private static final int MIN_WIDTH = 150;
+	/** The widest a line of the detail runs before it wraps. */
+	private static final int MAX_TEXT = 230;
 
 	private volatile Shown shown;
 
@@ -81,17 +83,18 @@ public class PilotPlaque extends Overlay
 		g.setFont(Theme.small());
 		FontMetrics small = g.getFontMetrics();
 
+		java.util.List<String> detail = wrap(s.detail, small, MAX_TEXT);
 		int textW = Math.max(bold.stringWidth(s.headline), small.stringWidth(s.kicker));
-		if (s.detail != null)
+		for (String line : detail)
 		{
-			textW = Math.max(textW, small.stringWidth(s.detail));
+			textW = Math.max(textW, small.stringWidth(line));
 		}
 		if (s.foot != null)
 		{
 			textW = Math.max(textW, small.stringWidth(s.foot));
 		}
 		int width = Math.max(MIN_WIDTH, PAD + ICON + 8 + textW + PAD + 2);
-		int lines = 2 + (s.detail != null ? 1 : 0) + (s.foot != null ? 1 : 0);
+		int lines = 2 + detail.size() + (s.foot != null ? 1 : 0);
 		int height = PAD + small.getHeight() + bold.getHeight() + (lines - 2) * small.getHeight() + PAD - 2;
 
 		RoundRectangle2D shape = new RoundRectangle2D.Float(0.5f, 0.5f, width - 1, height - 1, 12, 12);
@@ -115,10 +118,10 @@ public class PilotPlaque extends Overlay
 		g.setFont(Theme.title());
 		Ui.shadowed(g, s.headline, x, y, s.color);
 		g.setFont(Theme.small());
-		if (s.detail != null)
+		for (String line : detail)
 		{
 			y += small.getHeight();
-			Ui.shadowed(g, s.detail, x, y, Theme.TEXT);
+			Ui.shadowed(g, line, x, y, Theme.TEXT);
 		}
 		if (s.foot != null)
 		{
@@ -126,5 +129,31 @@ public class PilotPlaque extends Overlay
 			Ui.shadowed(g, s.foot, x, y, s.footColor == null ? Theme.TEXT_MUTED : s.footColor);
 		}
 		return new Dimension(width, height);
+	}
+
+	/** Breaks text into lines no wider than the width, at spaces. */
+	static java.util.List<String> wrap(String text, FontMetrics fm, int width)
+	{
+		java.util.List<String> lines = new java.util.ArrayList<>();
+		if (text == null || text.isEmpty())
+		{
+			return lines;
+		}
+		StringBuilder line = new StringBuilder();
+		for (String word : text.split(" "))
+		{
+			String next = line.length() == 0 ? word : line + " " + word;
+			if (line.length() > 0 && fm.stringWidth(next) > width)
+			{
+				lines.add(line.toString());
+				line = new StringBuilder(word);
+			}
+			else
+			{
+				line = new StringBuilder(next);
+			}
+		}
+		lines.add(line.toString());
+		return lines;
 	}
 }
