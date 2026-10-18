@@ -32,13 +32,16 @@ public final class View
 		final boolean shielded;
 		final boolean fallen;
 		final int health;
+		final int crowd;
 
-		public PortalState(Portal portal, boolean shielded, boolean fallen, int health)
+		/** @param crowd other players at it, or -1 when not seen */
+		public PortalState(Portal portal, boolean shielded, boolean fallen, int health, int crowd)
 		{
 			this.portal = portal;
 			this.shielded = shielded;
 			this.fallen = fallen;
 			this.health = health;
+			this.crowd = crowd;
 		}
 	}
 
@@ -52,13 +55,20 @@ public final class View
 		final List<Portal> order;
 		final int rotations;
 		final int seconds;
+		final int activity;
+		final int nextDrop;
 
 		/**
 		 * @param order the shield order as far as it is known, dropped ones first
 		 * @param rotations how many rotations are still possible
+		 * @param activity the activity bar from 0 to 100, or -1
+		 * @param nextDrop seconds until the next shield is due, or -1 when not learned
 		 */
-		public Fight(List<PortalState> portals, Advice advice, int knightHealth, int damage, List<Portal> order, int rotations, int seconds)
+		public Fight(List<PortalState> portals, Advice advice, int knightHealth, int damage, List<Portal> order, int rotations, int seconds,
+			int activity, int nextDrop)
 		{
+			this.activity = activity;
+			this.nextDrop = nextDrop;
 			this.portals = portals;
 			this.advice = advice;
 			this.knightHealth = knightHealth;

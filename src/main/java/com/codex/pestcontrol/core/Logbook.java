@@ -33,12 +33,24 @@ public class Logbook
 	private int won;
 	private int earned;
 	private long seconds;
+	private ShieldClock clock;
 
 	public Logbook()
 	{
 		goal = names(Goal.MELEE.getRewards());
 		owned = new ArrayList<>();
 		games = new ArrayList<>();
+		clock = new ShieldClock();
+	}
+
+	/** How long shields take to drop, learned from your games. */
+	public ShieldClock getClock()
+	{
+		if (clock == null)
+		{
+			clock = new ShieldClock();
+		}
+		return clock;
 	}
 
 	/** Fills in anything an older or damaged save left out. */
@@ -57,6 +69,10 @@ public class Logbook
 			games = new ArrayList<>();
 		}
 		games.removeIf(g -> g == null);
+		if (clock == null)
+		{
+			clock = new ShieldClock();
+		}
 		return this;
 	}
 

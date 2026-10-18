@@ -172,7 +172,7 @@ public class OutpostMap extends JComponent
 		double glow = 0.5 + 0.5 * Math.sin(System.currentTimeMillis() / 260.0);
 		for (Portal p : Portal.values())
 		{
-			View.PortalState s = f == null ? new View.PortalState(p, true, false, -1) : f.portal(p);
+			View.PortalState s = f == null ? new View.PortalState(p, true, false, -1, -1) : f.portal(p);
 			Point2D.Float c = spot(p, w, h);
 			boolean isTarget = p == target;
 			boolean isMaybe = waiting && maybe != null && maybe.contains(p);
@@ -182,6 +182,10 @@ public class OutpostMap extends JComponent
 			Color belowColor = s.fallen ? Theme.TEXT_FAINT : s.shielded ? Theme.TEXT_MUTED : Theme.TEXT;
 			Ui.shadowed(g, below, Math.round(c.x - fm.stringWidth(below) / 2f), Math.round(c.y + R + 4 + fm.getAscent()), belowColor);
 
+			if (s.crowd > 0 && !s.fallen)
+			{
+				paintCrowd(g, s.crowd, Math.max(14, c.x - R - 8), c.y + 6, fm);
+			}
 			int order = f == null ? -1 : f.order.indexOf(p);
 			if (order >= 0 && !s.fallen)
 			{
@@ -192,6 +196,23 @@ public class OutpostMap extends JComponent
 				String tag = isTarget ? (f.advice.getKind() == Advice.Kind.ATTACK ? "ATTACK" : "NEXT") : "MAYBE";
 				Color tagColor = isTarget ? Theme.GOLD_BRIGHT : Theme.TEXT_MUTED;
 				Ui.shadowed(g, tag, Math.round(c.x - fm.stringWidth(tag) / 2f), Math.round(c.y - R - 5), tagColor);
+			}
+		}
+
+		// The game clock and, once learned, when the next shield is due.
+		if (f != null)
+		{
+			g.setColor(Theme.TEXT_FAINT);
+			g.drawString(Format.clock(f.seconds), 8, 14);
+			int down = 0;
+			for (View.PortalState s : f.portals)
+			{
+				down += s.shielded ? 0 : 1;
+			}
+			if (f.nextDrop >= 0 && down < 4)
+			{
+				String due = f.nextDrop <= 3 ? "Shield any moment" : "Next shield " + f.nextDrop + "s";
+				Ui.shadowed(g, due, 8, 14 + fm.getHeight(), f.nextDrop <= 3 ? Theme.GOLD_BRIGHT : Theme.GOLD);
 			}
 		}
 
@@ -287,6 +308,23 @@ public class OutpostMap extends JComponent
 			g.draw(new Ellipse2D.Float(x - R - 3.5f, y - R - 3.5f, (R + 3.5f) * 2, (R + 3.5f) * 2));
 		}
 		g.setStroke(new BasicStroke(1f));
+	}
+
+	/** A small figure and a count: the other players at a portal. */
+	private static void paintCrowd(Graphics2D g, int players, float x, float y, FontMetrics fm)
+	{
+		String text = String.valueOf(players);
+		float w = 9 + fm.stringWidth(text) + 4;
+		RoundRectangle2D pill = new RoundRectangle2D.Float(x - w / 2, y - 6, w, 12, 10, 10);
+		g.setColor(Theme.alpha(Theme.INK_DEEP, 230));
+		g.fill(pill);
+		g.setColor(Theme.alpha(Theme.TEXT_MUTED, 150));
+		g.draw(pill);
+		float px = x - w / 2 + 6;
+		g.setColor(Theme.TEXT);
+		g.fill(new Ellipse2D.Float(px - 1.5f, y - 4, 3, 3));
+		g.fill(new RoundRectangle2D.Float(px - 2.5f, y - 0.5f, 5, 4, 2, 2));
+		g.drawString(text, Math.round(px + 5), Math.round(y + fm.getAscent() / 2f - 1));
 	}
 
 	private static void paintBadge(Graphics2D g, String text, float x, float y, FontMetrics fm)

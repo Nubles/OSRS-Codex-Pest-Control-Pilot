@@ -3,12 +3,14 @@ package com.codex.pestcontrol;
 import com.codex.pestcontrol.core.Advice;
 import com.codex.pestcontrol.core.Battle;
 import com.codex.pestcontrol.core.Boat;
+import com.codex.pestcontrol.core.Field;
 import com.codex.pestcontrol.core.GameRecord;
 import com.codex.pestcontrol.core.Goal;
 import com.codex.pestcontrol.core.Logbook;
 import com.codex.pestcontrol.core.Outlook;
 import com.codex.pestcontrol.core.Portal;
 import com.codex.pestcontrol.core.Reward;
+import com.codex.pestcontrol.core.Style;
 import com.codex.pestcontrol.overlay.MinimapMarker;
 import com.codex.pestcontrol.overlay.PilotPlaque;
 import com.codex.pestcontrol.overlay.PortalMarker;
@@ -37,6 +39,7 @@ import javax.inject.Inject;
 import javax.swing.SwingUtilities;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
+import net.runelite.api.EquipmentInventorySlot;
 import net.runelite.api.GameState;
 import net.runelite.api.Item;
 import net.runelite.api.ItemContainer;
@@ -91,6 +94,10 @@ public class CodexPestControlPlugin extends Plugin
 	private static final int SETTLE_TICKS = 4;
 	/** A spinner this close to a portal is healing it. */
 	private static final int SPINNER_RANGE = 8;
+	/** A brawler this close to a portal is in the way. */
+	private static final int BRAWLER_RANGE = 6;
+	/** A player this close to a portal is working it. */
+	private static final int CROWD_RANGE = 10;
 
 	private static final Pattern SHIELD = Pattern.compile("The ([a-z]+), [^ ]+ portal shield has dropped!", Pattern.CASE_INSENSITIVE);
 	private static final Pattern COMMENDATION = Pattern.compile("([0-9,]+) (?:Void Knight )?Commendation points?", Pattern.CASE_INSENSITIVE);
@@ -104,6 +111,7 @@ public class CodexPestControlPlugin extends Plugin
 	private static final Map<Integer, Integer> OPEN = new HashMap<>();
 	private static final Map<Integer, Integer> SHIELDED = new HashMap<>();
 	private static final Set<Integer> SPINNERS = new java.util.HashSet<>();
+	private static final Set<Integer> BRAWLERS = new java.util.HashSet<>();
 	private static final Skill[] VOID_SKILLS = {Skill.ATTACK, Skill.STRENGTH, Skill.DEFENCE, Skill.HITPOINTS, Skill.RANGED, Skill.MAGIC};
 
 	static
@@ -124,6 +132,11 @@ public class CodexPestControlPlugin extends Plugin
 		SPINNERS.add(NpcID.PEST_SPINNER_3);
 		SPINNERS.add(NpcID.PEST_SPINNER_4);
 		SPINNERS.add(NpcID.PEST_SPINNER_5);
+		BRAWLERS.add(NpcID.PEST_BRAWLER_1);
+		BRAWLERS.add(NpcID.PEST_BRAWLER_2);
+		BRAWLERS.add(NpcID.PEST_BRAWLER_3);
+		BRAWLERS.add(NpcID.PEST_BRAWLER_4);
+		BRAWLERS.add(NpcID.PEST_BRAWLER_5);
 	}
 
 	@Inject
@@ -162,6 +175,7 @@ public class CodexPestControlPlugin extends Plugin
 	private final PilotPlaque plaque = new PilotPlaque();
 	private final Map<Portal, NPC> portals = new EnumMap<>(Portal.class);
 	private final List<NPC> spinners = new ArrayList<>();
+	private final List<NPC> brawlers = new ArrayList<>();
 
 	private PilotPanel panel;
 	private NavigationButton navButton;
@@ -245,6 +259,7 @@ public class CodexPestControlPlugin extends Plugin
 			ending = null;
 			portals.clear();
 			spinners.clear();
+			brawlers.clear();
 		});
 		panel = null;
 	}
@@ -262,6 +277,7 @@ public class CodexPestControlPlugin extends Plugin
 			}
 			portals.clear();
 			spinners.clear();
+			brawlers.clear();
 			inLander = false;
 			save();
 			publish();
@@ -271,6 +287,7 @@ public class CodexPestControlPlugin extends Plugin
 			// A new area: every NPC the client knew is gone and the new ones spawn afresh.
 			portals.clear();
 			spinners.clear();
+			brawlers.clear();
 		}
 	}
 
@@ -309,6 +326,7 @@ public class CodexPestControlPlugin extends Plugin
 	{
 		NPC npc = event.getNpc();
 		spinners.remove(npc);
+		brawlers.remove(npc);
 		portals.values().removeIf(p -> p == npc);
 	}
 
@@ -320,6 +338,14 @@ public class CodexPestControlPlugin extends Plugin
 			if (!spinners.contains(npc))
 			{
 				spinners.add(npc);
+			}
+			return;
+		}
+		if (BRAWLERS.contains(id))
+		{
+			if (!brawlers.contains(npc))
+			{
+				brawlers.add(npc);
 			}
 			return;
 		}
@@ -425,19 +451,19 @@ public class CodexPestControlPlugin extends Plugin
 		boolean inGame = visible(InterfaceID.PestStatusOverlay.PEST_STATUS_PORT1);
 		if (inGame && battle == null)
 		{
-			battle = new Battle();
 			result = new Result();
 			ending = null;
 			for (NPC npc : client.getTopLevelWorldView().npcs())
 			{
 				track(npc);
 			}
-			// Portals that spawned before the game was seen may already be open.
+			battle = new Battle();
+			// Portals that spawned before the game was seen may already be open; when is not known.
 			for (Map.Entry<Portal, NPC> e : portals.entrySet())
 			{
 				if (OPEN.containsKey(e.getValue().getId()))
 				{
-					battle.shieldDropped(e.getKey());
+					battle.foundOpen(e.getKey());
 				}
 			}
 		}
@@ -545,6 +571,10 @@ public class CodexPestControlPlugin extends Plugin
 			earned = boat.getPoints();
 		}
 
+		if (outcome != GameRecord.Result.LEFT)
+		{
+			logbook.getClock().learn(b.getDropTicks());
+		}
 		Outlook before = outlook();
 		long now = System.currentTimeMillis();
 		logbook.record(new GameRecord(now, boat, outcome, earned, b.getDamage(), (int) Math.round(b.getTicks() * 0.6)));
@@ -769,34 +799,16 @@ public class CodexPestControlPlugin extends Plugin
 		Advice advice = null;
 		if (battle != null)
 		{
-			Map<Portal, Integer> distance = new EnumMap<>(Portal.class);
-			Map<Portal, Integer> healing = new EnumMap<>(Portal.class);
-			WorldPoint here = me == null ? null : me.getWorldLocation();
-			for (Map.Entry<Portal, NPC> e : portals.entrySet())
-			{
-				WorldPoint at = e.getValue().getWorldLocation();
-				if (here != null)
-				{
-					distance.put(e.getKey(), here.distanceTo(at));
-				}
-				int near = 0;
-				for (NPC s : spinners)
-				{
-					if (s.getWorldLocation().distanceTo(at) <= SPINNER_RANGE)
-					{
-						near++;
-					}
-				}
-				healing.put(e.getKey(), near);
-			}
-			advice = battle.advise(distance, healing, config.knightWarn());
+			Field field = field(me);
+			advice = battle.advise(field);
 			List<View.PortalState> states = new ArrayList<>();
 			for (Portal p : Portal.values())
 			{
-				states.add(new View.PortalState(p, battle.isShielded(p), battle.isFallen(p), battle.getHealth(p)));
+				Integer crowd = field.crowdAt(p);
+				states.add(new View.PortalState(p, battle.isShielded(p), battle.isFallen(p), battle.getHealth(p), crowd == null ? -1 : crowd));
 			}
 			fight = new View.Fight(states, advice, battle.getKnightHealth(), battle.getDamage(), battle.expectedOrder(),
-				battle.getPossible().size(), (int) Math.round(battle.getTicks() * 0.6));
+				battle.getPossible().size(), (int) Math.round(battle.getTicks() * 0.6), activity(), battle.secondsToNextDrop(logbook.getClock()));
 		}
 
 		boolean outpost = me != null && me.getWorldLocation().getRegionID() == OUTPOST_REGION;
@@ -808,6 +820,77 @@ public class CodexPestControlPlugin extends Plugin
 		{
 			SwingUtilities.invokeLater(() -> target.update(view));
 		}
+	}
+
+	/** What can be seen around the island now: distances, pests and players at each portal, and your style. */
+	private Field field(Player me)
+	{
+		Field field = new Field()
+			.knightWarn(config.knightWarn())
+			.activity(activity())
+			.nextDrop(battle.secondsToNextDrop(logbook.getClock()))
+			.style(style());
+		WorldPoint here = me == null ? null : me.getWorldLocation();
+		for (Map.Entry<Portal, NPC> e : portals.entrySet())
+		{
+			Portal p = e.getKey();
+			WorldPoint at = e.getValue().getWorldLocation();
+			if (here != null)
+			{
+				field.distance(p, here.distanceTo(at));
+			}
+			field.spinners(p, near(spinners, at, SPINNER_RANGE));
+			field.brawlers(p, near(brawlers, at, BRAWLER_RANGE));
+			int crowd = 0;
+			for (Player other : client.getTopLevelWorldView().players())
+			{
+				if (other != me && other.getWorldLocation().distanceTo(at) <= CROWD_RANGE)
+				{
+					crowd++;
+				}
+			}
+			field.crowd(p, crowd);
+		}
+		return field;
+	}
+
+	private static int near(List<NPC> npcs, WorldPoint at, int range)
+	{
+		int n = 0;
+		for (NPC npc : npcs)
+		{
+			if (npc.getWorldLocation().distanceTo(at) <= range)
+			{
+				n++;
+			}
+		}
+		return n;
+	}
+
+	/** Your style from the weapon you hold. */
+	private Style style()
+	{
+		ItemContainer worn = client.getItemContainer(InventoryID.WORN);
+		Item weapon = worn == null ? null : worn.getItem(EquipmentInventorySlot.WEAPON.getSlotIdx());
+		if (weapon == null || weapon.getId() <= 0)
+		{
+			return Style.MELEE;
+		}
+		return Style.ofWeapon(itemManager.getItemComposition(weapon.getId()).getName());
+	}
+
+	/** The game's activity bar as a percentage, or -1 when it cannot be read. */
+	private int activity()
+	{
+		Widget container = client.getWidget(InterfaceID.PestStatusOverlay.ACTIVITY_CONTAINER);
+		Widget bar = client.getWidget(InterfaceID.PestStatusOverlay.ACTIVITY_BAR);
+		Widget track = container == null ? null : container.getChild(0);
+		Widget fill = bar == null ? null : bar.getChild(0);
+		if (track == null || fill == null || track.getWidth() <= 0)
+		{
+			return -1;
+		}
+		return (int) Math.max(0, Math.min(100, Math.round(100.0 * fill.getWidth() / track.getWidth())));
 	}
 
 	private View view(View.State state, View.Fight fight, long now)
