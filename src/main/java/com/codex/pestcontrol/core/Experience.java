@@ -92,6 +92,67 @@ public final class Experience
 		return capped * capped / 600 * skill.factor;
 	}
 
+	/** Total experience a level starts at, the game's own table; 0 for level 1 or below. */
+	public static long xpFor(int level)
+	{
+		long points = 0;
+		for (int lvl = 1; lvl < Math.min(level, 127); lvl++)
+		{
+			points += (long) Math.floor(lvl + 300.0 * Math.pow(2.0, lvl / 7.0));
+		}
+		return points / 4;
+	}
+
+	/** The level a total of experience makes, up to 99. */
+	public static int levelFor(long xp)
+	{
+		int level = 1;
+		while (level < 99 && xpFor(level + 1) <= xp)
+		{
+			level++;
+		}
+		return level;
+	}
+
+	/**
+	 * Points it takes to reach a level by buying experience alone, in the biggest bundles that do
+	 * not buy more than is needed, and with each purchase paid at the level it is made at.
+	 *
+	 * @param xp experience in the skill now
+	 * @return the points, 0 when the level is already reached, or -1 below level 25, where the shop sells nothing
+	 */
+	public static int pointsTo(Skill skill, long xp, int target)
+	{
+		long goal = xpFor(Math.min(99, target));
+		int points = 0;
+		long have = xp;
+		while (have < goal)
+		{
+			int per = perPoint(skill, levelFor(have));
+			if (per == 0)
+			{
+				return -1;
+			}
+			long left = goal - have;
+			if (left >= per * 110L)
+			{
+				points += 100;
+				have += per * 110L;
+			}
+			else if (left >= per * 101L / 10)
+			{
+				points += 10;
+				have += per * 101L / 10;
+			}
+			else
+			{
+				points += 1;
+				have += per;
+			}
+		}
+		return points;
+	}
+
 	/** Experience the points buy when spent in the biggest bundles: hundreds, then tens, then ones. */
 	public static long forPoints(Skill skill, int level, int points)
 	{

@@ -130,6 +130,10 @@ public final class View
 	public com.codex.pestcontrol.core.Sitting sitting;
 	/** Real levels in {@link com.codex.pestcontrol.core.Experience.Skill} order, or null when logged out. */
 	public int[] levels;
+	/** Experience in the same order, or null when logged out. */
+	public long[] xp;
+	/** The levels Codex Navigator's pinned goals need in those skills; empty without Navigator. */
+	public List<com.codex.pestcontrol.core.NavigatorGoals.Need> goals = Collections.emptyList();
 
 	/**
 	 * @param fight the game in progress, or null

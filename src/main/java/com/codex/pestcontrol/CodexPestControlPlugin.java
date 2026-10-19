@@ -10,6 +10,7 @@ import com.codex.pestcontrol.core.GameSummary;
 import com.codex.pestcontrol.core.Goal;
 import com.codex.pestcontrol.core.Landers;
 import com.codex.pestcontrol.core.Logbook;
+import com.codex.pestcontrol.core.NavigatorGoals;
 import com.codex.pestcontrol.core.Outlook;
 import com.codex.pestcontrol.core.Portal;
 import com.codex.pestcontrol.core.Reward;
@@ -31,9 +32,12 @@ import com.google.gson.JsonParseException;
 import com.google.inject.Provides;
 import java.awt.Color;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -191,6 +195,10 @@ public class CodexPestControlPlugin extends Plugin
 	private Set<Reward> carriedOwned = EnumSet.noneOf(Reward.class);
 	/** Rewards in the bank as Codex Gear Roadmap last saved it, or null when it has saved none. Used until this plugin sees the bank. */
 	private SharedBank shared;
+	/** Codex Navigator's goal board as saved for this profile, or null; and what its goals need, read from it. */
+	private String navBoard;
+	private String navKey;
+	private List<NavigatorGoals.Need> navNeeds = Collections.emptyList();
 	/** The rewards in {@link #shared}, worked out once per read. */
 	private Set<Reward> sharedOwned = EnumSet.noneOf(Reward.class);
 	private Battle battle;
@@ -316,6 +324,17 @@ public class CodexPestControlPlugin extends Plugin
 		if (CodexPestControlConfig.GROUP.equals(event.getGroup()))
 		{
 			dirty = true;
+		}
+		else if (NavigatorGoals.GROUP.equals(event.getGroup()) && NavigatorGoals.KEY.equals(event.getKey()))
+		{
+			clientThread.invokeLater(() ->
+			{
+				if (profile != null && profile.equals(configManager.getRSProfileKey()))
+				{
+					readNavigator();
+					dirty = true;
+				}
+			});
 		}
 		else if (SharedBank.STEWARD_GROUP.equals(event.getGroup()) && SharedBank.STEWARD_KEY.equals(event.getKey())
 			|| SharedBank.ROADMAP_GROUP.equals(event.getGroup()) && SharedBank.ROADMAP_KEY.equals(event.getKey()))
@@ -769,6 +788,46 @@ public class CodexPestControlPlugin extends Plugin
 			configManager.getRSProfileConfiguration(SharedBank.ROADMAP_GROUP, SharedBank.ROADMAP_KEY));
 	}
 
+	/** Reads Codex Navigator's goal board for this profile; never writes it. */
+	private void readNavigator()
+	{
+		navBoard = profile == null ? null : configManager.getRSProfileConfiguration(NavigatorGoals.GROUP, NavigatorGoals.KEY);
+		navKey = null;
+	}
+
+	/** The levels Navigator's goals need in the shop's skills, read again only when the board or a level changes. */
+	private List<NavigatorGoals.Need> navigatorNeeds(int[] levels)
+	{
+		if (levels == null)
+		{
+			return Collections.emptyList();
+		}
+		String key = Arrays.toString(levels);
+		if (!key.equals(navKey))
+		{
+			navKey = key;
+			Map<String, Integer> byName = new LinkedHashMap<>();
+			for (Experience.Skill s : Experience.Skill.values())
+			{
+				byName.put(s.getTitle(), levels[s.ordinal()]);
+			}
+			navNeeds = NavigatorGoals.needs(gson, navBoard, byName);
+		}
+		return navNeeds;
+	}
+
+	/** Experience in the order of the skills the reward shop sells experience in. */
+	private long[] experience()
+	{
+		Experience.Skill[] skills = Experience.Skill.values();
+		long[] out = new long[skills.length];
+		for (int i = 0; i < skills.length; i++)
+		{
+			out[i] = client.getSkillExperience(Skill.valueOf(skills[i].name()));
+		}
+		return out;
+	}
+
 	private void readShared()
 	{
 		shared = readSharedBank();
@@ -820,6 +879,7 @@ public class CodexPestControlPlugin extends Plugin
 			logbook = new Logbook();
 		}
 		readShared();
+		readNavigator();
 		unsaved = false;
 		dirty = true;
 	}
@@ -1036,6 +1096,8 @@ public class CodexPestControlPlugin extends Plugin
 		view.combat = me == null ? 0 : me.getCombatLevel();
 		view.sitting = Sitting.latest(games, now);
 		view.levels = me == null ? null : levels();
+		view.xp = me == null ? null : experience();
+		view.goals = navigatorNeeds(view.levels);
 		return view;
 	}
 

@@ -5,7 +5,9 @@ import com.codex.pestcontrol.core.Battle;
 import com.codex.pestcontrol.core.Experience;
 import com.codex.pestcontrol.core.GameRecord;
 import com.codex.pestcontrol.core.Goal;
+import com.codex.pestcontrol.core.Habit;
 import com.codex.pestcontrol.core.Landers;
+import com.codex.pestcontrol.core.NavigatorGoals;
 import com.codex.pestcontrol.core.Outlook;
 import com.codex.pestcontrol.core.Portal;
 import com.codex.pestcontrol.core.Reward;
@@ -21,6 +23,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import javax.swing.JComponent;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.ScrollPaneConstants;
@@ -184,7 +187,18 @@ public class PilotPanel extends PluginPanel
 		Outlook o = view.outlook;
 		return view.state.name().equals("LOGGED_OUT") + "|" + view.goal + "|" + view.owned + "|" + view.ownedKnown + "|" + view.missing + "|" + view.elite
 			+ "|" + (o == null ? "-" : o.getPoints() + "/" + o.getPerGame() + "/" + Math.round(o.getMinutes())) + "|" + view.boat
-			+ "|" + view.games.size() + "|" + view.ownedFrom + "|" + view.combat + "|" + view.now / 60_000L;
+			+ "|" + view.games.size() + "|" + view.ownedFrom + "|" + view.combat + "|" + view.now / 60_000L
+			+ "|" + java.util.Arrays.toString(view.levels) + "|" + goalsKey();
+	}
+
+	private String goalsKey()
+	{
+		StringBuilder key = new StringBuilder();
+		for (NavigatorGoals.Need n : view.goals)
+		{
+			key.append(n.getGoal()).append(':').append(n.getSkill()).append(n.getLevel()).append(',');
+		}
+		return key.toString();
 	}
 
 	private boolean loggedOut(StackPanel stack)
@@ -355,13 +369,24 @@ public class PilotPanel extends PluginPanel
 		tiles.add(new StatTile(String.format(Locale.ENGLISH, o.getPerGame() % 1 == 0 ? "%.0f" : "%.1f", o.getPerGame()), "Per game",
 			o.isMeasured() ? "yours" : "assumed", o.isMeasured() ? Theme.TEAL : Theme.TEXT_MUTED));
 		progress.add(tiles, BorderLayout.CENTER);
+		StackPanel south = new StackPanel(4, 0);
+		Habit habit = habit();
+		long by = o.getGames() > 0 ? habit.afterGames(o.getGames(), view.now) : -1;
+		if (by > 0)
+		{
+			south.add(Ui.label("About " + Format.shortDay(by) + " at your pace", Theme.small(), Theme.TEAL));
+		}
 		if (o.getNextBuy() != null && !o.isAffordable())
 		{
-			progress.add(Ui.wrapped("You can already buy the " + o.getNextBuy().getTitle().toLowerCase(Locale.ENGLISH) + ".", Theme.small(), Theme.TEAL, WIDTH - 30), BorderLayout.SOUTH);
+			south.add(Ui.wrapped("You can already buy the " + o.getNextBuy().getTitle().toLowerCase(Locale.ENGLISH) + ".", Theme.small(), Theme.TEAL, WIDTH - 30));
 		}
 		else if (o.isOverCap())
 		{
-			progress.add(Ui.wrapped("The knights hold at most " + Format.number(com.codex.pestcontrol.core.Logbook.POINTS_CAP) + " points, so buy as you go.", Theme.small(), Theme.EMBER, WIDTH - 30), BorderLayout.SOUTH);
+			south.add(Ui.wrapped("The knights hold at most " + Format.number(com.codex.pestcontrol.core.Logbook.POINTS_CAP) + " points, so buy as you go.", Theme.small(), Theme.EMBER, WIDTH - 30));
+		}
+		if (south.getComponentCount() > 0)
+		{
+			progress.add(south, BorderLayout.SOUTH);
 		}
 		stack.add(progress);
 		String faster = fasterLander();
@@ -393,6 +418,7 @@ public class PilotPanel extends PluginPanel
 
 		addMilestones(stack, o);
 		addSpare(stack, o);
+		addGoals(stack, o, habit);
 
 		stack.add(new SectionHeader("Rewards", "click to choose"));
 		int spend = Math.max(0, o.getPoints());
@@ -478,6 +504,77 @@ public class PilotPanel extends PluginPanel
 			? "Your goal is done, so every point is spare."
 			: "Points beyond what your goal still costs.";
 		stack.add(Ui.wrapped(text + " Spend them 100 at a time for 10% more experience.", Theme.small(), Theme.TEXT_FAINT, WIDTH - 16));
+	}
+
+	/** How much the player plays here, from the games the logbook keeps. */
+	private Habit habit()
+	{
+		return Habit.of(view.games, view.played <= view.games.size(), view.now);
+	}
+
+	/**
+	 * The levels Codex Navigator's pinned goals need in the skills the reward shop sells, each with
+	 * the points that buy it, the games those take and when, at the player's pace.
+	 */
+	private void addGoals(StackPanel stack, Outlook o, Habit habit)
+	{
+		if (view.goals.isEmpty() || view.xp == null)
+		{
+			return;
+		}
+		stack.add(new SectionHeader("For your goals", "Navigator"));
+		Card card = new Card(new BorderLayout());
+		card.accent(Theme.TEAL);
+		StackPanel rows = new StackPanel(6, 0);
+		int spare = Experience.spare(o);
+		for (NavigatorGoals.Need n : view.goals)
+		{
+			Experience.Skill skill = null;
+			for (Experience.Skill s : Experience.Skill.values())
+			{
+				if (s.getTitle().equals(n.getSkill()))
+				{
+					skill = s;
+				}
+			}
+			if (skill == null)
+			{
+				continue;
+			}
+			int points = Experience.pointsTo(skill, view.xp[skill.ordinal()], n.getLevel());
+			String how;
+			Color color = Theme.TEXT_MUTED;
+			if (points < 0)
+			{
+				how = "The shop sells " + skill.getTitle() + " from level " + Experience.MIN_LEVEL;
+				color = Theme.TEXT_FAINT;
+			}
+			else if (spare >= points)
+			{
+				how = Format.number(points) + " points: your spare points buy it now";
+				color = Theme.GREEN;
+			}
+			else
+			{
+				int games = (int) Math.ceil(Math.max(0, points - spare) / Math.max(0.5, o.getPerGame()));
+				long by = habit.afterGames(games, view.now);
+				how = Format.number(points) + " points, " + Format.plural(games, "game", "games") + (by > 0 ? ", " + Format.shortDay(by) : "");
+			}
+			JPanel row = new JPanel(new BorderLayout(0, 1));
+			row.setOpaque(false);
+			JPanel top = new JPanel(new BorderLayout(6, 0));
+			top.setOpaque(false);
+			JLabel title = Ui.label(n.getGoal(), Theme.body(), n.isFocus() ? Theme.GOLD_BRIGHT : Theme.TEXT);
+			title.setToolTipText(n.getGoal() + (n.isFocus() ? ", your Navigator focus" : "") + ", needs " + skill.getTitle() + " " + n.getLevel());
+			top.add(title, BorderLayout.CENTER);
+			top.add(Ui.label(skill.getTitle() + " " + n.getLevel(), Theme.small(), Theme.GOLD), BorderLayout.EAST);
+			row.add(top, BorderLayout.NORTH);
+			row.add(Ui.label(how, Theme.small(), color), BorderLayout.SOUTH);
+			rows.add(row);
+		}
+		card.add(rows, BorderLayout.CENTER);
+		stack.add(card);
+		stack.add(Ui.wrapped("Points the goal above leaves spare count first; the rest are earned at your rate.", Theme.small(), Theme.TEXT_FAINT, WIDTH - 16));
 	}
 
 	/** The pieces still needed in the order to buy them, each with the games until it can be. */
