@@ -429,14 +429,15 @@ public class PilotPanel extends PluginPanel
 		progress.accent(o.isComplete() ? Theme.GREEN : o.isAffordable() ? Theme.TEAL : Theme.GOLD);
 		Meter meter = new Meter();
 		String held = o.isPointsKnown() ? Format.number(o.getPoints()) : "?";
-		meter.set(o.progress(), held + " / " + Format.number(o.getCost()) + " points",
+		meter.set(o.progress(), o.getCost() == 0 ? held + " points" : held + " / " + Format.number(o.getCost()) + " points",
 			o.getCost() == 0 ? "" : Math.round(o.progress() * 100) + "%", Theme.progressColor(o.progress()));
 		progress.add(meter, BorderLayout.NORTH);
 		JPanel tiles = new JPanel(new GridLayout(1, 3, 6, 0));
 		tiles.setOpaque(false);
 		if (o.isGamesKnown())
 		{
-			tiles.add(new StatTile(Format.number(o.getGames()), "Games", "left", o.getGames() == 0 ? Theme.GREEN : Theme.GOLD));
+			// No games left is green only when nothing waits on the diary.
+			tiles.add(new StatTile(Format.number(o.getGames()), "Games", "left", o.getGames() == 0 && locked(o).isEmpty() ? Theme.GREEN : Theme.GOLD));
 			tiles.add(new StatTile(o.getGames() == 0 ? "-" : Format.span(o.getMinutes()), "Time", "about", Theme.GOLD));
 		}
 		else
@@ -772,7 +773,7 @@ public class PilotPanel extends PluginPanel
 	}
 
 	/** How the buy order is chosen, under it. */
-	static final String ORDER_RULE = "First the pieces your points buy together, the set that spends the most of them, so the knights hold as few as they can. Then the cheapest first.";
+	static final String ORDER_RULE = "First the pieces your points buy together that spend the most of them, then the cheapest first.";
 
 	/**
 	 * A line when another lander you can board has earned you clearly more points an hour than the

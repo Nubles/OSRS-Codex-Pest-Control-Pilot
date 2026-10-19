@@ -67,7 +67,13 @@ public final class VoidSheet
 	{
 		List<Fact> out = new ArrayList<>();
 		String held = o.isPointsKnown() ? Format.number(o.getPoints()) : "?";
-		out.add(new Fact("Points", held, "of " + Format.number(o.getCost()) + " needed", o.isAffordable() ? Theme.TEAL : Theme.GOLD));
+		// Points that cover elite pieces the hard diary still locks do not buy them yet.
+		boolean locked = false;
+		for (Reward r : o.getNeeded())
+		{
+			locked |= r.isElite() && !elite;
+		}
+		out.add(new Fact("Points", held, "of " + Format.number(o.getCost()) + " needed", o.isAffordable() && !locked ? Theme.TEAL : Theme.GOLD));
 		if (o.isComplete())
 		{
 			out.add(new Fact("Games left", "None", "the set is yours", Theme.GREEN));
@@ -78,13 +84,7 @@ public final class VoidSheet
 		}
 		else if (o.getGames() == 0)
 		{
-			// Points that cover elite pieces the hard diary still locks do not buy them yet.
-			boolean locked = false;
-			for (Reward r : o.getNeeded())
-			{
-				locked |= r.isElite() && !elite;
-			}
-			out.add(locked ? new Fact("Games left", "None", "the diary comes first", Theme.EMBER)
+			out.add(locked ? new Fact("Games left", "None", "diary first", Theme.EMBER)
 				: new Fact("Games left", "None", "points enough now", Theme.TEAL));
 		}
 		else
