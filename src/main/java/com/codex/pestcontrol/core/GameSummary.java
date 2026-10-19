@@ -20,6 +20,45 @@ public final class GameSummary
 	}
 
 	/**
+	 * The line when the points newly cover a piece of the goal, or all of it, or null.
+	 *
+	 * @param locked elite pieces the hard diary still locks, which points cannot buy
+	 */
+	public static String announcement(Outlook before, Outlook after, java.util.Set<Reward> locked)
+	{
+		if (before == null || after == null || !after.isPointsKnown())
+		{
+			return null;
+		}
+		Reward now = firstBuy(after, locked);
+		Reward was = firstBuy(before, locked);
+		// Points that cover a piece the diary locks do not buy it, so neither is announced.
+		boolean all = after.isAffordable() && (locked == null || locked.isEmpty());
+		boolean wasAll = before.isAffordable() && (locked == null || locked.isEmpty());
+		if (now == null || was == now && wasAll == all)
+		{
+			return null;
+		}
+		return all
+			? "your " + number(after.getPoints()) + " points now cover everything left in your goal. Visit the Void Knights' reward shop."
+			: "your " + number(after.getPoints()) + " points now cover the " + now.getTitle().toLowerCase(Locale.ENGLISH) + ".";
+	}
+
+	/** The first piece the buy order says the points buy now, never a locked one, or null. */
+	private static Reward firstBuy(Outlook o, java.util.Set<Reward> locked)
+	{
+		if (!o.isPointsKnown())
+		{
+			return null;
+		}
+		for (Outlook.Milestone m : o.milestones(locked))
+		{
+			return m.getGames() == 0 && (locked == null || !locked.contains(m.getReward())) ? m.getReward() : null;
+		}
+		return null;
+	}
+
+	/**
 	 * @param after the goal as it stands after the game, or null
 	 * @param sitting the sitting the game ends, or null
 	 * @return the line, or null for a game left before the end

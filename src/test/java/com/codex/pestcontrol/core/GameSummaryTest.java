@@ -48,4 +48,23 @@ public class GameSummaryTest
 		String text = GameSummary.of(new GameRecord(0, Boat.VETERAN, GameRecord.Result.LOST, 0, 80, 300), full, null);
 		assertEquals("Lost, 80 damage. You hold 3,960 of the 4,000 points the knights will keep: spend some.", text);
 	}
+
+	@Test
+	public void theChatNamesWhatThePointsBuyAndNeverALockedPiece()
+	{
+		java.util.Set<Reward> goal = EnumSet.copyOf(Goal.ELITE.getRewards());
+		java.util.Set<Reward> owned = EnumSet.of(Reward.GLOVES, Reward.RANGER_HELM);
+		java.util.Set<Reward> locked = EnumSet.of(Reward.ELITE_TOP, Reward.ELITE_ROBE);
+		Outlook before = Outlook.of(goal, owned, 190, 5, 7, true);
+		Outlook after = Outlook.of(goal, owned, 410, 5, 7, true);
+		// Only the elite top and robe are left and the diary locks both: no "visit the shop".
+		assertNull(GameSummary.announcement(before, after, locked));
+		assertEquals("your 410 points now cover everything left in your goal. Visit the Void Knights' reward shop.",
+			GameSummary.announcement(before, after, EnumSet.noneOf(Reward.class)));
+		// With an open piece beside a locked one, the line names the open piece.
+		java.util.Set<Reward> mixed = EnumSet.of(Reward.ELITE_TOP, Reward.TOP);
+		assertEquals("your 260 points now cover the void knight top.", GameSummary.announcement(
+			Outlook.of(mixed, EnumSet.noneOf(Reward.class), 100, 5, 7, true), Outlook.of(mixed, EnumSet.noneOf(Reward.class), 260, 5, 7, true),
+			EnumSet.of(Reward.ELITE_TOP)));
+	}
 }

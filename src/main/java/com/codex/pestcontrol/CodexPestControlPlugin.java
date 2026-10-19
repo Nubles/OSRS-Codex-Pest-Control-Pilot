@@ -746,19 +746,26 @@ public class CodexPestControlPlugin extends Plugin
 
 	private void announce(Outlook before, Outlook after)
 	{
-		if (!config.announce() || before == null || after == null || !after.isPointsKnown())
+		if (!config.announce() || after == null)
 		{
 			return;
 		}
-		Reward now = after.getNextBuy();
-		Reward was = before.getNextBuy();
-		if (now == null || was == now && before.isAffordable() == after.isAffordable())
+		Set<Reward> locked = EnumSet.noneOf(Reward.class);
+		if (client.getVarbitValue(VarbitID.WESTERN_DIARY_HARD_COMPLETE) != 1)
+		{
+			for (Reward r : after.getNeeded())
+			{
+				if (r.isElite())
+				{
+					locked.add(r);
+				}
+			}
+		}
+		String text = GameSummary.announcement(before, after, locked);
+		if (text == null)
 		{
 			return;
 		}
-		String text = after.isAffordable()
-			? "your " + Format.number(after.getPoints()) + " points now cover everything left in your goal. Visit the Void Knights' reward shop."
-			: "your " + Format.number(after.getPoints()) + " points now cover the " + now.getTitle().toLowerCase(Locale.ENGLISH) + ".";
 		chatMessageManager.queue(QueuedMessage.builder()
 			.type(ChatMessageType.CONSOLE)
 			.runeLiteFormattedMessage(new ChatMessageBuilder()
