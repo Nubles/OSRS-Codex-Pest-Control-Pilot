@@ -596,12 +596,13 @@ public class CodexPestControlPlugin extends Plugin
 		if (battle != null && portals.isEmpty())
 		{
 			// Back from a dropped connection, the scene was loaded afresh: find the portals again.
-			rejoining |= watch.isBusy();
 			for (NPC npc : client.getTopLevelWorldView().npcs())
 			{
 				track(npc);
 			}
 		}
+		// The first tick back in play: the scene has been sent again, so a portal that opens from
+		// now on is seen opening.
 		rejoining = false;
 
 		if (battle != null)
