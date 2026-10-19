@@ -200,7 +200,8 @@ class Wardrobe extends JComponent
 			case CAN_BUY:
 				return r.getTitle() + ": you can buy it now (" + r.getCost() + " points). Click to take it out of your goal";
 			case WANTED:
-				return r.getTitle() + ": " + Math.max(0, r.getCost() - Math.max(0, points)) + " points to go. Click to take it out of your goal";
+				return r.getTitle() + ": " + (pointsKnown ? Math.max(0, r.getCost() - Math.max(0, points)) + " points to go" : r.getCost() + " points")
+					+ ". Click to take it out of your goal";
 			case LOCKED:
 				return r.getTitle() + ": needs the hard Western Provinces diary";
 			default:
@@ -255,31 +256,50 @@ class Wardrobe extends JComponent
 		}
 
 		// Under it: where the goal stands, in one line.
-		String foot;
-		Color footColor = Theme.TEXT_MUTED;
-		if (wanted == 0)
-		{
-			foot = "Click a slot to set a goal";
-		}
-		else if (have == wanted)
-		{
-			foot = "All of " + title.toLowerCase(Locale.ENGLISH) + " is yours";
-			footColor = Theme.GREEN;
-		}
-		else
-		{
-			int left = 0;
-			for (Reward r : goal)
-			{
-				left += owned.contains(r) ? 0 : r.getCost();
-			}
-			int toGo = Math.max(0, left - (pointsKnown ? Math.max(0, points) : 0));
-			foot = toGo == 0 ? "Enough points for the rest now" : Format.number(toGo) + " points to the rest";
-			footColor = toGo == 0 ? Theme.TEAL : Theme.TEXT_MUTED;
-		}
+		String foot = foot(title, goal, owned, points, pointsKnown, elite);
+		Color footColor = wanted == 0 ? Theme.TEXT_MUTED : have == wanted ? Theme.GREEN
+			: foot.startsWith("Enough") ? Theme.TEAL : foot.startsWith("Points") ? Theme.GOLD : Theme.TEXT_MUTED;
 		int fy = HEIGHT - 14;
 		Ui.shadowed(g, Ui.clip(foot, small, w - PAD * 2), (w - Math.min(w - PAD * 2, small.stringWidth(foot))) / 2, fy, footColor);
 		g.dispose();
+	}
+
+	/**
+	 * The line under the slots: what the rest of the goal still costs, or that the points are there,
+	 * minding that the elite pieces cannot be bought until the diary is done.
+	 */
+	static String foot(String title, Set<Reward> goal, Set<Reward> owned, int points, boolean pointsKnown, boolean elite)
+	{
+		int left = 0;
+		boolean locked = false;
+		boolean all = true;
+		for (Reward r : goal)
+		{
+			if (!owned.contains(r))
+			{
+				all = false;
+				left += r.getCost();
+				locked |= r.isElite() && !elite;
+			}
+		}
+		if (goal.isEmpty())
+		{
+			return "Click a slot to set a goal";
+		}
+		if (all)
+		{
+			return "All of " + title.toLowerCase(Locale.ENGLISH) + " is yours";
+		}
+		if (!pointsKnown)
+		{
+			return Format.number(left) + " points for the rest";
+		}
+		int toGo = Math.max(0, left - Math.max(0, points));
+		if (toGo > 0)
+		{
+			return Format.number(toGo) + " points to the rest";
+		}
+		return locked ? "Points enough; the diary is due" : "Enough points for the rest now";
 	}
 
 	private void paintSlot(Graphics2D g, Slot s, int x, int y, FontMetrics small)

@@ -71,4 +71,19 @@ public class WardrobeTest
 		assertEquals(Wardrobe.Look.NONE, Wardrobe.look(Reward.MACE, goal, owned, 900, true, true));
 		assertNotNull(Wardrobe.layout(goal, owned));
 	}
+
+	@Test
+	public void theFootSaysWhenTheDiaryNotThePointsHoldsTheGoalBack()
+	{
+		Set<Reward> goal = EnumSet.of(Reward.TOP, Reward.ELITE_TOP);
+		Set<Reward> none = EnumSet.noneOf(Reward.class);
+		int cost = Reward.TOP.getCost() + Reward.ELITE_TOP.getCost();
+		assertEquals("Points enough; the diary is due", Wardrobe.foot("Elite", goal, none, cost, true, false));
+		assertEquals("Enough points for the rest now", Wardrobe.foot("Elite", goal, none, cost, true, true));
+		assertEquals("10 points to the rest", Wardrobe.foot("Elite", goal, none, cost - 10, true, true));
+		// Before the points are read, the whole cost rather than a guess at what is left.
+		assertEquals(Format.number(cost) + " points for the rest", Wardrobe.foot("Elite", goal, none, 0, false, true));
+		assertEquals("All of elite is yours", Wardrobe.foot("Elite", goal, goal, 0, true, true));
+		assertEquals("Click a slot to set a goal", Wardrobe.foot("Elite", none, none, 0, true, true));
+	}
 }
