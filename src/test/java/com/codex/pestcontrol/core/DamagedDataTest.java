@@ -1,6 +1,7 @@
 package com.codex.pestcontrol.core;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import com.google.gson.Gson;
@@ -213,13 +214,19 @@ public class DamagedDataTest
 		{
 			run.run();
 		}
-		int runs = 50;
-		long t0 = System.nanoTime();
-		for (int i = 0; i < runs; i++)
+		// The quickest of five batches, so a busy shared build machine cannot fail the check.
+		double best = Double.MAX_VALUE;
+		for (int batch = 0; batch < 5; batch++)
 		{
-			run.run();
+			int runs = 50;
+			long t0 = System.nanoTime();
+			for (int i = 0; i < runs; i++)
+			{
+				run.run();
+			}
+			best = Math.min(best, (System.nanoTime() - t0) / 1e6 / runs);
 		}
-		return (System.nanoTime() - t0) / 1e6 / runs;
+		return best;
 	}
 
 	@Test
@@ -339,5 +346,22 @@ public class DamagedDataTest
 				throw new AssertionError("goalBoard " + Damaged.show(damaged) + ": " + e, e);
 			}
 		}
+	}
+
+	@Test
+	public void onlyASaveThisVersionCannotKeepWholeIsPutAside()
+	{
+		// The plugin's own saves, however full, are never copied aside at login.
+		for (Logbook own : new Logbook[]{new Logbook(), good(30), good(10_000)})
+		{
+			String json = GSON.toJson(own);
+			assertFalse(Salvage.wouldLose(GSON, json, Logbook.read(GSON, json)));
+		}
+		// A newer version's field, or a damaged one, would be lost at the next save: kept aside first.
+		String json = GSON.toJson(good(30));
+		String newer = json.replaceFirst("\\{", "{\"addedLater\":[1,2],");
+		assertTrue(Salvage.wouldLose(GSON, newer, Logbook.read(GSON, newer)));
+		String damaged = json.replaceFirst("\"points\":-?[0-9]+", "\"points\":{\"x\":true}");
+		assertTrue(Salvage.wouldLose(GSON, damaged, Logbook.read(GSON, damaged)));
 	}
 }

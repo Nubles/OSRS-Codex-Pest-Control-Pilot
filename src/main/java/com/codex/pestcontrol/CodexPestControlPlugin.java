@@ -15,6 +15,7 @@ import com.codex.pestcontrol.core.NavigatorGoals;
 import com.codex.pestcontrol.core.Outlook;
 import com.codex.pestcontrol.core.Portal;
 import com.codex.pestcontrol.core.Reward;
+import com.codex.pestcontrol.core.Salvage;
 import com.codex.pestcontrol.core.SharedBank;
 import com.codex.pestcontrol.core.Sitting;
 import com.codex.pestcontrol.core.Style;
@@ -45,6 +46,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.inject.Inject;
@@ -100,6 +102,10 @@ public class CodexPestControlPlugin extends Plugin
 {
 	private static final Logger log = LoggerFactory.getLogger(CodexPestControlPlugin.class);
 	private static final String LOGBOOK_KEY = "logbook";
+	/** Where a save this version could not keep whole is put aside, once, before it is written over. */
+	private static final String BACKUP_KEY = "logbookBackup";
+	/** Past this a save is far bigger than any the pilot writes, and is not copied aside. */
+	private static final int BACKUP_MAX = 1_000_000;
 	/** Codex Gear Roadmap keeps the bank it last saw here (item ids); read only, and only when that plugin has saved one. */
 	/** The Void Knights' Outpost island. */
 	private static final int OUTPOST_REGION = 10537;
@@ -155,6 +161,9 @@ public class CodexPestControlPlugin extends Plugin
 
 	@Inject
 	private ClientThread clientThread;
+
+	@Inject
+	private ScheduledExecutorService executor;
 
 	@Inject
 	private ClientToolbar clientToolbar;
@@ -218,6 +227,8 @@ public class CodexPestControlPlugin extends Plugin
 	private boolean inLander;
 	private boolean dirty;
 	private boolean unsaved;
+	/** Counts logbook loads, so a slow read that an account switch or shutdown overtook is dropped. */
+	private int loadGeneration;
 
 	/** What a game's closing messages said. */
 	private static final class Result
@@ -276,6 +287,8 @@ public class CodexPestControlPlugin extends Plugin
 		clientThread.invokeLater(() ->
 		{
 			save();
+			// A logbook still being read off the client thread must not come back after this.
+			loadGeneration++;
 			logbook = null;
 			profile = null;
 			battle = null;
@@ -934,16 +947,71 @@ public class CodexPestControlPlugin extends Plugin
 		logbook = null;
 		shared = null;
 		sharedOwned = EnumSet.noneOf(Reward.class);
+		int generation = ++loadGeneration;
 		if (profile == null)
 		{
 			return;
 		}
 		// A damaged save keeps all it can: a field or game that cannot be read is lost alone.
-		logbook = Logbook.read(gson, configManager.getRSProfileConfiguration(CodexPestControlConfig.GROUP, LOGBOOK_KEY));
+		String saved = configManager.getRSProfileConfiguration(CodexPestControlConfig.GROUP, LOGBOOK_KEY);
+		if (saved == null || saved.length() < Logbook.LARGE)
+		{
+			Logbook read = Logbook.read(gson, saved);
+			loaded(profile, saved, read, Salvage.wouldLose(gson, saved, read));
+		}
+		else
+		{
+			// Far bigger than any save the pilot writes (a hand-edited one): reading it takes tens of
+			// milliseconds, so it is read off the client thread and taken up on it. Until then the
+			// pilot shows and records nothing, as when logged out.
+			String forProfile = profile;
+			executor.execute(() ->
+			{
+				Logbook got;
+				boolean loses;
+				try
+				{
+					got = Logbook.read(gson, saved);
+					loses = Salvage.wouldLose(gson, saved, got);
+				}
+				catch (RuntimeException e)
+				{
+					log.warn("Could not read the saved logbook", e);
+					got = new Logbook();
+					loses = true;
+				}
+				Logbook read = got;
+				boolean lose = loses;
+				clientThread.invokeLater(() ->
+				{
+					// Not if the account changed, or the plugin was turned off, while it was read.
+					if (generation == loadGeneration && forProfile.equals(profile))
+					{
+						loaded(forProfile, saved, read, lose);
+						dirty = true;
+					}
+				});
+			});
+		}
 		readShared();
 		readNavigator();
 		unsaved = false;
 		dirty = true;
+	}
+
+	/**
+	 * Takes up the logbook read from {@code saved}, first putting {@code saved} aside when saving
+	 * over it would lose something ({@code lose}): a newer version's fields, or damage mended.
+	 */
+	private void loaded(String forProfile, String saved, Logbook read, boolean lose)
+	{
+		if (lose && saved.length() <= BACKUP_MAX)
+		{
+			log.warn("The saved logbook holds what this version cannot keep; a copy is kept under {}", BACKUP_KEY);
+			configManager.setConfiguration(CodexPestControlConfig.GROUP, forProfile, BACKUP_KEY, saved);
+		}
+		logbook = read;
+		unsaved = false;
 	}
 
 	private void save()
@@ -1165,6 +1233,29 @@ public class CodexPestControlPlugin extends Plugin
 		return view;
 	}
 
+	/**
+	 * The plaque's line on the goal once the points are read. Points that cover elite pieces the
+	 * hard diary still locks do not send the player to the shop for all of it, as the panel's
+	 * crest and the void card say too.
+	 */
+	static String goalDetail(Outlook o, boolean elite)
+	{
+		if (o.isComplete())
+		{
+			return "Every piece is yours";
+		}
+		if (o.isAffordable())
+		{
+			boolean locked = false;
+			for (Reward r : o.getNeeded())
+			{
+				locked |= r.isElite() && !elite;
+			}
+			return locked ? "Points enough; the diary is due" : "Enough for all of it: visit the reward shop";
+		}
+		return Format.number(o.getRemaining()) + " to go, about " + Format.plural(o.getGames(), "game", "games");
+	}
+
 	private void showPlaque(View.State state, Advice advice, Battle b, Outlook o, Goal preset, VoidCheck voidCheck)
 	{
 		CodexPestControlConfig.PlaqueMode mode = config.plaque();
@@ -1207,9 +1298,7 @@ public class CodexPestControlPlugin extends Plugin
 			plaque.show(new PilotPlaque.Shown("PEST CONTROL", goal, Theme.GOLD, "Board a lander to read your points", null, null));
 			return;
 		}
-		String detail = o.isComplete() ? "Every piece is yours"
-			: o.isAffordable() ? "Enough for all of it: visit the reward shop"
-			: Format.number(o.getRemaining()) + " to go, about " + Format.plural(o.getGames(), "game", "games");
+		String detail = goalDetail(o, client.getVarbitValue(VarbitID.WESTERN_DIARY_HARD_COMPLETE) == 1);
 		plaque.show(new PilotPlaque.Shown("PEST CONTROL", Format.number(o.getPoints()) + " points", Theme.GOLD_BRIGHT,
 			goal + ": " + detail, null, null));
 	}

@@ -76,7 +76,7 @@ The Pilot works on its own. With other Codex plugins installed, it reads what th
 
 The game's own status bar gives each portal's health, the knight's and your activity. Shields are read from the portals and from the "portal shield has dropped" messages. Your damage is the sum of your own hitsplats in the game. Your style comes from the weapon you hold. Your points are read from the lander when you board one and from the message at the end of each game.
 
-Everything is kept per account in your RuneLite profile. A save damaged on disk keeps all it can: one unreadable game or setting is lost alone.
+Everything is kept per account in your RuneLite profile. A save damaged on disk keeps all it can: one unreadable game or setting is lost alone. Before a damaged save, or one a newer version wrote, is first saved over, a copy of it as found is kept aside in your profile.
 
 ## Rules posture
 

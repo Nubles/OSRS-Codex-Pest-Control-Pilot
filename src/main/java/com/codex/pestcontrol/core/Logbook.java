@@ -14,6 +14,11 @@ public class Logbook
 {
 	/** Games kept one by one; older ones live on only in the totals. */
 	static final int KEEP = 60;
+	/**
+	 * A save at least this long is far bigger than any the pilot writes (60 games come to about
+	 * 6,000 characters) and takes long enough to read that it is read off the client thread.
+	 */
+	public static final int LARGE = 100_000;
 	/** Games the points-per-game average is taken over. */
 	static final int RECENT = 20;
 	/** A gap longer than this between two games is a break, not lander time. */
