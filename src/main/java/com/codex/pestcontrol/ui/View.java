@@ -4,6 +4,7 @@ import com.codex.pestcontrol.core.Advice;
 import com.codex.pestcontrol.core.Boat;
 import com.codex.pestcontrol.core.GameRecord;
 import com.codex.pestcontrol.core.Goal;
+import com.codex.pestcontrol.core.Landers;
 import com.codex.pestcontrol.core.Outlook;
 import com.codex.pestcontrol.core.Portal;
 import com.codex.pestcontrol.core.Reward;
@@ -33,10 +34,18 @@ public final class View
 		final boolean fallen;
 		final int health;
 		final int crowd;
+		/** Seconds until it falls at the team's pace, Battle.STALLED when not being worn down, -1 when not known. */
+		final int eta;
 
 		/** @param crowd other players at it, or -1 when not seen */
 		public PortalState(Portal portal, boolean shielded, boolean fallen, int health, int crowd)
 		{
+			this(portal, shielded, fallen, health, crowd, -1);
+		}
+
+		public PortalState(Portal portal, boolean shielded, boolean fallen, int health, int crowd, int eta)
+		{
+			this.eta = eta;
 			this.portal = portal;
 			this.shielded = shielded;
 			this.fallen = fallen;
@@ -102,6 +111,12 @@ public final class View
 	final long seconds;
 	final List<GameRecord> games;
 	final long now;
+	/** Whether the pieces owned were read from Codex Gear Roadmap's saved bank. */
+	public boolean ownedFromRoadmap;
+	/** Each lander's figures from your games. */
+	public List<Landers.Line> landers = Collections.emptyList();
+	/** Your combat level, 0 when not known. */
+	public int combat;
 
 	/**
 	 * @param fight the game in progress, or null

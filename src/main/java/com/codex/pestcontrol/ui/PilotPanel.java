@@ -4,6 +4,7 @@ import com.codex.pestcontrol.core.Advice;
 import com.codex.pestcontrol.core.Battle;
 import com.codex.pestcontrol.core.GameRecord;
 import com.codex.pestcontrol.core.Goal;
+import com.codex.pestcontrol.core.Landers;
 import com.codex.pestcontrol.core.Outlook;
 import com.codex.pestcontrol.core.Portal;
 import com.codex.pestcontrol.core.Reward;
@@ -180,7 +181,7 @@ public class PilotPanel extends PluginPanel
 		Outlook o = view.outlook;
 		return view.state.name().equals("LOGGED_OUT") + "|" + view.goal + "|" + view.owned + "|" + view.ownedKnown + "|" + view.missing + "|" + view.elite
 			+ "|" + (o == null ? "-" : o.getPoints() + "/" + o.getPerGame() + "/" + Math.round(o.getMinutes())) + "|" + view.boat
-			+ "|" + view.now / 60_000L;
+			+ "|" + view.games.size() + "|" + view.ownedFromRoadmap + "|" + view.combat + "|" + view.now / 60_000L;
 	}
 
 	private boolean loggedOut(StackPanel stack)
@@ -360,6 +361,11 @@ public class PilotPanel extends PluginPanel
 			progress.add(Ui.wrapped("The knights hold at most " + Format.number(com.codex.pestcontrol.core.Logbook.POINTS_CAP) + " points, so buy as you go.", Theme.small(), Theme.EMBER, WIDTH - 30), BorderLayout.SOUTH);
 		}
 		stack.add(progress);
+		String faster = fasterLander();
+		if (faster != null)
+		{
+			stack.add(Ui.wrapped(faster, Theme.small(), Theme.TEAL, WIDTH - 16));
+		}
 
 		boolean levels = !view.missing.isEmpty() && hasVoidGear();
 		boolean diary = !view.elite && wantsElite();
@@ -381,6 +387,8 @@ public class PilotPanel extends PluginPanel
 			need.add(Ui.wrapped(text.toString(), Theme.small(), Theme.TEXT_MUTED, WIDTH - 30), BorderLayout.CENTER);
 			stack.add(need);
 		}
+
+		addMilestones(stack, o);
 
 		stack.add(new SectionHeader("Rewards", "click to choose"));
 		int spend = Math.max(0, o.getPoints());
@@ -427,9 +435,58 @@ public class PilotPanel extends PluginPanel
 			foot.append("Assumes won ").append(view.boat == null ? "" : view.boat.getTitle().toLowerCase(Locale.ENGLISH) + " ")
 				.append("games until three of yours are measured");
 		}
-		foot.append(view.ownedKnown ? ". Pieces in your bank count as owned." : ". Open your bank so pieces you own are not counted.");
+		foot.append(view.ownedFromRoadmap ? ". Pieces in your bank, as Codex Gear Roadmap last saw it, count as owned."
+			: view.ownedKnown ? ". Pieces in your bank count as owned." : ". Open your bank so pieces you own are not counted.");
 		stack.add(Ui.wrapped(foot.toString(), Theme.small(), Theme.TEXT_FAINT, WIDTH - 16));
 		replace(goal, stack);
+	}
+
+	/** The pieces still needed in the order to buy them, each with the games until it can be. */
+	private void addMilestones(StackPanel stack, Outlook o)
+	{
+		if (o.getNeeded().size() < 2)
+		{
+			return;
+		}
+		java.util.Set<Reward> locked = java.util.EnumSet.noneOf(Reward.class);
+		if (!view.elite)
+		{
+			for (Reward r : o.getNeeded())
+			{
+				if (r.isElite())
+				{
+					locked.add(r);
+				}
+			}
+		}
+		List<Outlook.Milestone> steps = o.milestones(locked);
+		stack.add(new SectionHeader("Buy order", "cheapest first"));
+		Card card = new Card(new BorderLayout());
+		StackPanel rows = new StackPanel(0, 0);
+		for (int i = 0; i < steps.size(); i++)
+		{
+			Outlook.Milestone m = steps.get(i);
+			rows.add(new MilestoneRow(m, i == 0, i == steps.size() - 1, locked.contains(m.getReward()), icons));
+		}
+		card.add(rows, BorderLayout.CENTER);
+		stack.add(card);
+	}
+
+	/**
+	 * A line when another lander you can board has earned you clearly more points an hour than the
+	 * one the estimate assumes, or null.
+	 */
+	private String fasterLander()
+	{
+		Landers.Line best = Landers.best(view.landers, view.combat);
+		Landers.Line now = view.boat == null ? null : Landers.of(view.landers, view.boat);
+		if (best == null || now == null || !now.isTrusted() || best.getBoat() == now.getBoat()
+			|| best.pointsPerHour() < now.pointsPerHour() * 1.1)
+		{
+			return null;
+		}
+		return "Your " + best.getBoat().getTitle().toLowerCase(Locale.ENGLISH) + " games earn " + Math.round(best.pointsPerHour())
+			+ " points an hour, against " + Math.round(now.pointsPerHour()) + " on " + now.getBoat().getTitle().toLowerCase(Locale.ENGLISH) + ".";
 	}
 
 	private boolean wantsElite()
@@ -484,12 +541,81 @@ public class PilotPanel extends PluginPanel
 			replace(record, stack);
 			return;
 		}
+		addDamage(stack, games);
+		addLanders(stack);
+
 		stack.add(new SectionHeader("Recent games", Format.plural(Math.min(RECENT, games.size()), "game", "games")));
 		for (int i = games.size() - 1; i >= 0 && i >= games.size() - RECENT; i--)
 		{
 			stack.add(new GameRow(games.get(i), view.now));
 		}
 		replace(record, stack);
+	}
+
+	/** Games charted for damage. */
+	private static final int CHARTED = 20;
+
+	/** Your damage game by game against the 50 a game needs for points. */
+	private void addDamage(StackPanel stack, List<GameRecord> games)
+	{
+		List<GameRecord> finished = new ArrayList<>();
+		for (int i = games.size() - 1; i >= 0 && finished.size() < CHARTED; i--)
+		{
+			if (games.get(i).getResult() != GameRecord.Result.LEFT)
+			{
+				finished.add(0, games.get(i));
+			}
+		}
+		if (finished.size() < 2)
+		{
+			return;
+		}
+		int sum = 0;
+		int shortOf = 0;
+		for (GameRecord g : finished)
+		{
+			sum += g.getDamage();
+			shortOf += g.getDamage() < Battle.DAMAGE_FOR_POINTS ? 1 : 0;
+		}
+		stack.add(new SectionHeader("Your damage", "last " + finished.size()));
+		Card card = new Card(new BorderLayout(0, 6));
+		card.add(new DamageChart(finished), BorderLayout.CENTER);
+		String line = "Average " + Math.round(sum / (double) finished.size()) + " a game. "
+			+ (shortOf == 0 ? "Every one of these earned its points." : shortOf + " of " + finished.size() + " fell short of the 50 for points.");
+		card.add(Ui.wrapped(line, Theme.small(), shortOf == 0 ? Theme.TEXT_MUTED : Theme.EMBER, WIDTH - 30), BorderLayout.SOUTH);
+		stack.add(card);
+	}
+
+	/** Each lander you have played, side by side, with the one that pays best an hour lit. */
+	private void addLanders(StackPanel stack)
+	{
+		if (view.landers.isEmpty())
+		{
+			return;
+		}
+		Landers.Line best = Landers.best(view.landers, view.combat);
+		stack.add(new SectionHeader("Landers", "points an hour"));
+		Card card = new Card(new BorderLayout(0, 4));
+		StackPanel rows = new StackPanel(5, 0);
+		for (Landers.Line l : view.landers)
+		{
+			boolean top = l == best && view.landers.size() > 1;
+			JPanel row = new JPanel(new BorderLayout(6, 0));
+			row.setOpaque(false);
+			JPanel words = new JPanel(new BorderLayout(0, 1));
+			words.setOpaque(false);
+			words.add(Ui.label(l.getBoat().getTitle() + (top ? "  -  best" : ""), Theme.body(), top ? Theme.GOLD_BRIGHT : Theme.TEXT), BorderLayout.NORTH);
+			words.add(Ui.label(Format.plural(l.getGames(), "game", "games") + ", " + Math.round(l.winRate() * 100) + "% won, "
+				+ String.format(Locale.ENGLISH, "%.1f", l.getPointsPerGame()) + " a game", Theme.small(), Theme.TEXT_FAINT), BorderLayout.SOUTH);
+			row.add(words, BorderLayout.CENTER);
+			String rate = l.isTrusted() ? String.valueOf(Math.round(l.pointsPerHour())) : "-";
+			row.add(Ui.label(rate, Theme.title(), top ? Theme.GOLD_BRIGHT : l.isTrusted() ? Theme.GOLD : Theme.TEXT_FAINT), BorderLayout.EAST);
+			rows.add(row);
+		}
+		card.add(rows, BorderLayout.CENTER);
+		card.add(Ui.wrapped("Points a game count losses; the hour counts the wait in the lander. A lander needs " + Landers.TRUSTED
+			+ " games before it is rated.", Theme.small(), Theme.TEXT_FAINT, WIDTH - 30), BorderLayout.SOUTH);
+		stack.add(card);
 	}
 
 	static Card note(String title, String text)

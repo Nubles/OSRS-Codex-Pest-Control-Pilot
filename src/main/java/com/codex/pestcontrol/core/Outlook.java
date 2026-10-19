@@ -18,6 +18,7 @@ public final class Outlook
 	private final double perGame;
 	private final boolean measured;
 	private final Reward nextBuy;
+	private final double minutesPerGame;
 
 	private Outlook(List<Reward> needed, List<Reward> owned, int cost, int points, double perGame, double minutesPerGame, boolean measured)
 	{
@@ -29,6 +30,7 @@ public final class Outlook
 		this.measured = measured;
 		this.remaining = Math.max(0, cost - Math.max(0, points));
 		this.games = remaining == 0 ? 0 : (int) Math.ceil(remaining / perGame);
+		this.minutesPerGame = minutesPerGame;
 		this.minutes = games * minutesPerGame;
 		Reward cheapest = null;
 		for (Reward r : needed)
@@ -149,5 +151,75 @@ public final class Outlook
 	public boolean isOverCap()
 	{
 		return cost > Logbook.POINTS_CAP;
+	}
+
+	/** One piece on the way to the goal: the points it takes counting the pieces before it, and when. */
+	public static final class Milestone
+	{
+		private final Reward reward;
+		private final int total;
+		private final int games;
+		private final double minutes;
+
+		Milestone(Reward reward, int total, int games, double minutes)
+		{
+			this.reward = reward;
+			this.total = total;
+			this.games = games;
+			this.minutes = minutes;
+		}
+
+		public Reward getReward()
+		{
+			return reward;
+		}
+
+		/** Points spent once this piece and every one before it are bought. */
+		public int getTotal()
+		{
+			return total;
+		}
+
+		/** Games until it can be bought, 0 when it can be already. */
+		public int getGames()
+		{
+			return games;
+		}
+
+		public double getMinutes()
+		{
+			return minutes;
+		}
+	}
+
+	/**
+	 * The pieces still needed in the order to buy them, cheapest first so each is yours as soon as
+	 * possible and the Void Knights never hold more points than they must. Pieces in the given set
+	 * (elite pieces still locked behind the diary) go last.
+	 */
+	public List<Milestone> milestones(Set<Reward> last)
+	{
+		List<Reward> order = new ArrayList<>(needed);
+		order.sort((a, b) ->
+		{
+			boolean la = last != null && last.contains(a);
+			boolean lb = last != null && last.contains(b);
+			if (la != lb)
+			{
+				return la ? 1 : -1;
+			}
+			return Integer.compare(a.getCost(), b.getCost());
+		});
+		List<Milestone> out = new ArrayList<>();
+		int total = 0;
+		int held = Math.max(0, points);
+		for (Reward r : order)
+		{
+			total += r.getCost();
+			int shortfall = Math.max(0, total - held);
+			int g = shortfall == 0 ? 0 : (int) Math.ceil(shortfall / perGame);
+			out.add(new Milestone(r, total, g, g * minutesPerGame));
+		}
+		return out;
 	}
 }

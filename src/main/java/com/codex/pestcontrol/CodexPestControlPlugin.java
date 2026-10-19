@@ -6,6 +6,7 @@ import com.codex.pestcontrol.core.Boat;
 import com.codex.pestcontrol.core.Field;
 import com.codex.pestcontrol.core.GameRecord;
 import com.codex.pestcontrol.core.Goal;
+import com.codex.pestcontrol.core.Landers;
 import com.codex.pestcontrol.core.Logbook;
 import com.codex.pestcontrol.core.Outlook;
 import com.codex.pestcontrol.core.Portal;
@@ -88,6 +89,9 @@ public class CodexPestControlPlugin extends Plugin
 {
 	private static final Logger log = LoggerFactory.getLogger(CodexPestControlPlugin.class);
 	private static final String LOGBOOK_KEY = "logbook";
+	/** Codex Gear Roadmap keeps the bank it last saw here (item ids); read only, and only when that plugin has saved one. */
+	private static final String GEAR_ROADMAP_GROUP = "codexgearroadmap";
+	private static final String GEAR_ROADMAP_BANK = "bank";
 	/** The Void Knights' Outpost island. */
 	private static final int OUTPOST_REGION = 10537;
 	/** Ticks after a game's status bar goes for its closing messages to arrive. */
@@ -183,6 +187,8 @@ public class CodexPestControlPlugin extends Plugin
 	private String profile;
 	private Logbook logbook;
 	private Set<Reward> carriedOwned = EnumSet.noneOf(Reward.class);
+	/** Rewards in the bank as Codex Gear Roadmap last saved it, or null when it has saved none. Used until this plugin sees the bank. */
+	private Set<Reward> roadmapOwned;
 	private Battle battle;
 	/** A game whose status bar has gone, waiting a few ticks for its closing messages. */
 	private Battle ending;
@@ -371,7 +377,15 @@ public class CodexPestControlPlugin extends Plugin
 	{
 		if (battle != null && event.getActor() instanceof NPC && event.getHitsplat().isMine())
 		{
-			battle.addDamage(event.getHitsplat().getAmount());
+			Portal on = null;
+			for (Map.Entry<Portal, NPC> e : portals.entrySet())
+			{
+				if (e.getValue() == event.getActor())
+				{
+					on = e.getKey();
+				}
+			}
+			battle.addDamage(event.getHitsplat().getAmount(), on);
 		}
 	}
 
@@ -695,10 +709,51 @@ public class CodexPestControlPlugin extends Plugin
 		return out;
 	}
 
+	/** The shape Codex Gear Roadmap saves its bank in; only the item ids are read. */
+	private static final class SavedBank
+	{
+		List<Integer> items;
+	}
+
+	/** The void pieces in Codex Gear Roadmap's saved bank, or null when that plugin is not installed or has not seen the bank. */
+	private Set<Reward> readRoadmapBank()
+	{
+		try
+		{
+			String json = configManager.getRSProfileConfiguration(GEAR_ROADMAP_GROUP, GEAR_ROADMAP_BANK);
+			if (json == null || json.isEmpty())
+			{
+				return null;
+			}
+			SavedBank bank = gson.fromJson(json, SavedBank.class);
+			if (bank == null || bank.items == null)
+			{
+				return null;
+			}
+			Set<Reward> out = EnumSet.noneOf(Reward.class);
+			for (Integer id : bank.items)
+			{
+				for (Reward r : Reward.values())
+				{
+					if (id != null && r.isOwnedBy(id))
+					{
+						out.add(r);
+					}
+				}
+			}
+			return out;
+		}
+		catch (JsonParseException e)
+		{
+			return null;
+		}
+	}
+
 	private void loadProfile()
 	{
 		profile = configManager.getRSProfileKey();
 		logbook = null;
+		roadmapOwned = null;
 		if (profile == null)
 		{
 			return;
@@ -720,6 +775,7 @@ public class CodexPestControlPlugin extends Plugin
 		{
 			logbook = new Logbook();
 		}
+		roadmapOwned = readRoadmapBank();
 		unsaved = false;
 		dirty = true;
 	}
@@ -737,8 +793,18 @@ public class CodexPestControlPlugin extends Plugin
 	private Set<Reward> owned()
 	{
 		Set<Reward> owned = logbook.getOwned();
+		if (fromRoadmap())
+		{
+			owned.addAll(roadmapOwned);
+		}
 		owned.addAll(carriedOwned);
 		return owned;
+	}
+
+	/** Whether the owned pieces come from Codex Gear Roadmap's bank, this plugin not having seen the bank yet. */
+	private boolean fromRoadmap()
+	{
+		return logbook.getOwnedSeen() == 0 && roadmapOwned != null;
 	}
 
 	private Boat estimateBoat()
@@ -805,7 +871,8 @@ public class CodexPestControlPlugin extends Plugin
 			for (Portal p : Portal.values())
 			{
 				Integer crowd = field.crowdAt(p);
-				states.add(new View.PortalState(p, battle.isShielded(p), battle.isFallen(p), battle.getHealth(p), crowd == null ? -1 : crowd));
+				states.add(new View.PortalState(p, battle.isShielded(p), battle.isFallen(p), battle.getHealth(p), crowd == null ? -1 : crowd,
+					battle.secondsToFall(p)));
 			}
 			fight = new View.Fight(states, advice, battle.getKnightHealth(), battle.getDamage(), battle.expectedOrder(),
 				battle.getPossible().size(), (int) Math.round(battle.getTicks() * 0.6), activity(), battle.secondsToNextDrop(logbook.getClock()));
@@ -917,9 +984,13 @@ public class CodexPestControlPlugin extends Plugin
 		List<GameRecord> games = new ArrayList<>(logbook.getGames());
 		GameRecord last = games.isEmpty() ? null : games.get(games.size() - 1);
 		Player me = client.getLocalPlayer();
-		return new View(state, me == null ? null : me.getName(), fight, last, outlook, goal, owned(), Goal.matching(goal),
-			estimateBoat(), logbook.getOwnedSeen() > 0, missing, elite, logbook.getPlayed(), logbook.getWon(), logbook.getEarned(),
+		View view = new View(state, me == null ? null : me.getName(), fight, last, outlook, goal, owned(), Goal.matching(goal),
+			estimateBoat(), logbook.getOwnedSeen() > 0 || fromRoadmap(), missing, elite, logbook.getPlayed(), logbook.getWon(), logbook.getEarned(),
 			logbook.getSeconds(), games, now);
+		view.ownedFromRoadmap = fromRoadmap();
+		view.landers = Landers.of(games);
+		view.combat = me == null ? 0 : me.getCombatLevel();
+		return view;
 	}
 
 	private void showPlaque(View.State state, Advice advice, Battle b, Outlook o, Goal preset)
