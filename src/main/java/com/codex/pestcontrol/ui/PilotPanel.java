@@ -124,6 +124,7 @@ public class PilotPanel extends PluginPanel
 	{
 		tabs.setSelected(index, false);
 		cards.show(content, TABS[index]);
+		refresh(true);
 	}
 
 	private void updateCrest()
@@ -131,7 +132,7 @@ public class PilotPanel extends PluginPanel
 		Outlook o = view.outlook;
 		if (o == null)
 		{
-			crest.update("PEST CONTROL", null, null, "Log in to plan your points", null, Theme.TEXT_MUTED, Theme.GOLD);
+			crest.update("PEST CONTROL", null, null, "Log in to plan your points", "Log in to begin", Theme.TEXT_MUTED, Theme.GOLD);
 			return;
 		}
 		String heading = goalTitle().toUpperCase(Locale.ENGLISH);
@@ -165,20 +166,57 @@ public class PilotPanel extends PluginPanel
 		return view.goal.isEmpty() ? "No goal" : "Your own goal";
 	}
 
+	/** The Battle page shows an older view than the one in hand. */
+	private boolean battleStale = true;
+
+	/**
+	 * The Battle page changes every tick of a game; the other two only when what they show does.
+	 * While the panel is closed nothing is rebuilt, and while it is open only the page in view is.
+	 */
 	private void rebuild()
 	{
-		rebuildBattle();
-		String g = goalSignature();
-		if (!g.equals(goalShown))
+		battleStale = true;
+		refresh(false);
+	}
+
+	@Override
+	public void onActivate()
+	{
+		refresh(true);
+	}
+
+	private void refresh(boolean force)
+	{
+		if (!force && !isShowing())
 		{
-			goalShown = g;
-			rebuildGoal();
+			return;
 		}
-		String r = view.state + "|" + view.played + "|" + view.games.size() + "|" + view.now / 60_000L;
-		if (!r.equals(recordShown))
+		int page = tabs.getSelected();
+		if (page == 0)
 		{
-			recordShown = r;
-			rebuildRecord();
+			if (battleStale)
+			{
+				battleStale = false;
+				rebuildBattle();
+			}
+		}
+		else if (page == 1)
+		{
+			String g = goalSignature();
+			if (!g.equals(goalShown))
+			{
+				goalShown = g;
+				rebuildGoal();
+			}
+		}
+		else
+		{
+			String r = view.state + "|" + view.played + "|" + view.games.size() + "|" + view.now / 60_000L;
+			if (!r.equals(recordShown))
+			{
+				recordShown = r;
+				rebuildRecord();
+			}
 		}
 	}
 
@@ -373,6 +411,9 @@ public class PilotPanel extends PluginPanel
 		}
 		Outlook o = view.outlook;
 		stack.add(presets);
+		// The goal as it would be worn, a slot a reward; a click there chooses as the list below does.
+		stack.add(new Wardrobe(view.preset != null ? view.preset.getTitle() : "your goal", view.goal, view.owned,
+			Math.max(0, o.getPoints()), o.isPointsKnown(), view.elite, icons, actions == null ? null : actions::toggle));
 
 		Card progress = new Card(new BorderLayout(0, 8));
 		progress.accent(o.isComplete() ? Theme.GREEN : o.isAffordable() ? Theme.TEAL : Theme.GOLD);
@@ -570,7 +611,7 @@ public class PilotPanel extends PluginPanel
 			}
 			else if (spare >= points)
 			{
-				how = Format.number(points) + " points: your spare points buy it now";
+				how = Format.number(points) + " points: your spare points cover it";
 				color = Theme.GREEN;
 			}
 			else
