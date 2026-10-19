@@ -184,10 +184,11 @@ public class OutpostMap extends JComponent
 			if (!s.fallen && s.eta >= 0)
 			{
 				// How long the rest of the team will take to bring it down, so the slow portal stands out.
+				// A portal only you are hitting reads as stalled for the team; say it is yours instead.
 				boolean stalled = s.eta == com.codex.pestcontrol.core.Battle.STALLED;
-				String pace = stalled ? "stalled" : "~" + s.eta + "s";
+				String pace = stalled ? s.yoursAlone ? "just you" : "stalled" : "~" + s.eta + "s";
 				Ui.shadowed(g, pace, Math.round(c.x - fm.stringWidth(pace) / 2f), Math.round(c.y + R + 5 + fm.getAscent() + fm.getHeight() - 2),
-					stalled ? Theme.EMBER : Theme.TEXT_FAINT);
+					stalled ? s.yoursAlone ? Theme.GOLD : Theme.EMBER : Theme.TEXT_FAINT);
 			}
 
 			if (s.crowd > 0 && !s.fallen)

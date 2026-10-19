@@ -193,26 +193,42 @@ public final class Outlook
 	}
 
 	/**
-	 * The pieces still needed in the order to buy them, cheapest first so each is yours as soon as
-	 * possible and the Void Knights never hold more points than they must. Pieces in the given set
-	 * (elite pieces still locked behind the diary) go last.
+	 * The pieces still needed in the order to buy them. Whenever the points held cover a piece, the
+	 * dearest one they cover comes next (the same piece the outlook names as buyable now), so the
+	 * Void Knights hold as few points as they can; otherwise the cheapest, as it is yours soonest.
+	 * Pieces in the given set (elite pieces still locked behind the diary) go last.
 	 */
 	public List<Milestone> milestones(Set<Reward> last)
 	{
-		List<Reward> order = new ArrayList<>(needed);
-		order.sort((a, b) ->
+		List<Reward> open = new ArrayList<>();
+		List<Reward> later = new ArrayList<>();
+		for (Reward r : needed)
 		{
-			boolean la = last != null && last.contains(a);
-			boolean lb = last != null && last.contains(b);
-			if (la != lb)
+			(last != null && last.contains(r) ? later : open).add(r);
+		}
+		// Stable sorts keep the reward order between pieces of the same cost.
+		open.sort((a, b) -> Integer.compare(a.getCost(), b.getCost()));
+		later.sort((a, b) -> Integer.compare(a.getCost(), b.getCost()));
+		List<Reward> order = new ArrayList<>();
+		int held = Math.max(0, points);
+		int spent = 0;
+		while (!open.isEmpty())
+		{
+			Reward next = open.get(0);
+			for (Reward r : open)
 			{
-				return la ? 1 : -1;
+				if (r.getCost() <= held - spent && r.getCost() > next.getCost())
+				{
+					next = r;
+				}
 			}
-			return Integer.compare(a.getCost(), b.getCost());
-		});
+			open.remove(next);
+			order.add(next);
+			spent += next.getCost();
+		}
+		order.addAll(later);
 		List<Milestone> out = new ArrayList<>();
 		int total = 0;
-		int held = Math.max(0, points);
 		for (Reward r : order)
 		{
 			total += r.getCost();

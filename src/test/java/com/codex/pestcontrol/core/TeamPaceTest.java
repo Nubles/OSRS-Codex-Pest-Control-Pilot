@@ -99,14 +99,25 @@ public class TeamPaceTest
 			b.setHealth(Portal.BLUE, q);
 		}
 		assertEquals(Portal.BLUE, b.advise(null).getPortal());
-		// The team arrives at blue and wears it down; purple is now a little slower but not by much.
+		// The team arrives at blue and wears it down fast; purple is now the slower, but only by a little.
 		for (int t = 0; t < 18; t++)
 		{
 			b.tick();
-			b.setHealth(Portal.PURPLE, p -= 2);
-			b.setHealth(Portal.BLUE, q -= 3);
+			b.setHealth(Portal.PURPLE, p -= 1);
+			b.setHealth(Portal.BLUE, q -= 6);
 		}
+		int purple = b.secondsToFall(Portal.PURPLE);
+		int blue = b.secondsToFall(Portal.BLUE);
+		assertTrue(purple + " vs " + blue, purple > blue && purple - blue < 12);
 		assertEquals(Portal.BLUE, b.advise(null).getPortal());
+		// Once purple lags clearly, the advice does move.
+		for (int t = 0; t < 18; t++)
+		{
+			b.tick();
+			b.setHealth(Portal.PURPLE, p);
+			b.setHealth(Portal.BLUE, q -= 2);
+		}
+		assertEquals(Portal.PURPLE, b.advise(null).getPortal());
 	}
 
 	@Test
@@ -128,5 +139,29 @@ public class TeamPaceTest
 		b.setHealth(Portal.BLUE, 250);
 		assertEquals(-1, b.secondsToFall(Portal.BLUE));
 		assertEquals(Portal.PURPLE, b.advise(null).getPortal());
+	}
+
+	@Test
+	public void aPortalOnlyYouAreHittingIsCalledYoursNotEmpty()
+	{
+		Battle b = new Battle();
+		b.shieldDropped(Portal.PURPLE);
+		b.shieldDropped(Portal.BLUE);
+		b.addDamage(60);
+		int hp = 200;
+		for (int t = 0; t < 12; t++)
+		{
+			b.tick();
+			b.setHealth(Portal.PURPLE, 150 - 6 * t);
+			b.setHealth(Portal.BLUE, hp);
+			b.addDamage(4, Portal.BLUE);
+			hp -= 4;
+		}
+		assertTrue(b.isYoursAlone(Portal.BLUE));
+		assertTrue(!b.isYoursAlone(Portal.PURPLE));
+		// Nobody else is at blue, but you are: the advice must not say nobody is there.
+		Advice a = b.advise(new Field().crowd(Portal.BLUE, 0).crowd(Portal.PURPLE, 6));
+		assertEquals(Portal.BLUE, a.getPortal());
+		assertTrue(a.getDetail(), a.getDetail().startsWith("Only you are"));
 	}
 }

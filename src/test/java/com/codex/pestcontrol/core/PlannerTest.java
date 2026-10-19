@@ -27,6 +27,22 @@ public class PlannerTest
 	}
 
 	@Test
+	public void thePieceTheOutlookSaysYouCanBuyNowIsFirstInTheBuyOrder()
+	{
+		// 412 points toward the melee set with the gloves owned: the top (250) and the helm (200)
+		// are each affordable, not both. The outlook names the top, so the buy order must start there.
+		Outlook o = Outlook.of(EnumSet.copyOf(Goal.MELEE.getRewards()), EnumSet.of(Reward.GLOVES), 412, 4.2, 4, true);
+		List<Outlook.Milestone> m = o.milestones(null);
+		assertEquals(o.getNextBuy(), m.get(0).getReward());
+		assertEquals(Reward.TOP, m.get(0).getReward());
+		assertEquals(0, m.get(0).getGames());
+		// Then the helm: 450 in all, 38 short at 4.2 a game.
+		assertEquals(Reward.MELEE_HELM, m.get(1).getReward());
+		assertEquals(10, m.get(1).getGames());
+		assertEquals(Reward.ROBE, m.get(2).getReward());
+	}
+
+	@Test
 	public void piecesAlreadyAffordableAreNow()
 	{
 		Outlook o = Outlook.of(EnumSet.of(Reward.SEAL, Reward.GLOVES), EnumSet.noneOf(Reward.class), 200, 5, 5, true);
@@ -66,6 +82,24 @@ public class PlannerTest
 		// A level 80 cannot board the veteran lander, and two games are not enough to rate one.
 		assertEquals(Boat.INTERMEDIATE, Landers.best(lines, 80).getBoat());
 		assertNull(Landers.best(Landers.of(games.subList(4, 6)), 110));
+	}
+
+	@Test
+	public void aLanderYouCannotBoardIsNeverTheBest()
+	{
+		List<GameRecord> games = new ArrayList<>();
+		// The veteran lander pays far better here, but needs combat 100.
+		for (int i = 0; i < 3; i++)
+		{
+			games.add(game(i * 5, Boat.VETERAN, GameRecord.Result.WON, 5, 120));
+		}
+		for (int i = 0; i < 3; i++)
+		{
+			games.add(game(100 + i * 8, Boat.INTERMEDIATE, GameRecord.Result.WON, 4, 140));
+		}
+		List<Landers.Line> lines = Landers.of(games);
+		assertEquals(Boat.VETERAN, Landers.best(lines, 110).getBoat());
+		assertEquals(Boat.INTERMEDIATE, Landers.best(lines, 80).getBoat());
 	}
 
 	@Test

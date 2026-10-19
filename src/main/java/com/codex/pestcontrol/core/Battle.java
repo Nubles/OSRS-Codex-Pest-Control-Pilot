@@ -197,6 +197,18 @@ public class Battle
 		return (int) Math.ceil(last[1] / perTick * 0.6);
 	}
 
+	/**
+	 * Whether you are the only one wearing the open portal down: your hits have landed on it lately
+	 * but, leaving them out, its health is not falling. Its pace then reads as stalled, which is the
+	 * team's pace, not yours.
+	 */
+	public boolean isYoursAlone(Portal portal)
+	{
+		List<int[]> hits = ownHits.get(portal.ordinal());
+		trim(hits);
+		return !hits.isEmpty() && secondsToFall(portal) == STALLED;
+	}
+
 	public void tick()
 	{
 		ticks++;
@@ -458,7 +470,14 @@ public class Battle
 		if (eta == STALLED)
 		{
 			Integer crowd = f.crowdAt(p);
-			lead = crowd != null && crowd == 0 ? "Nobody is there: it holds the game up" : "The team is not wearing it down: it holds the game up";
+			if (isYoursAlone(p))
+			{
+				lead = "Only you are wearing it down: it holds the game up";
+			}
+			else
+			{
+				lead = crowd != null && crowd == 0 ? "Nobody is there: it holds the game up" : "The team is not wearing it down: it holds the game up";
+			}
 		}
 		else
 		{

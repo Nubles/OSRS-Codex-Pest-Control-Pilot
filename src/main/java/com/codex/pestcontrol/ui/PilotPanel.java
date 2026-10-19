@@ -437,6 +437,11 @@ public class PilotPanel extends PluginPanel
 		}
 		foot.append(view.ownedFromRoadmap ? ". Pieces in your bank, as Codex Gear Roadmap last saw it, count as owned."
 			: view.ownedKnown ? ". Pieces in your bank count as owned." : ". Open your bank so pieces you own are not counted.");
+		if (view.ownedFromRoadmap && view.goal.contains(Reward.SEAL) && !view.owned.contains(Reward.SEAL))
+		{
+			// Codex Gear Roadmap saves only the gear it ranks, and a void seal is not gear to it.
+			foot.append(" It does not keep void seals, so open your bank once to count yours.");
+		}
 		stack.add(Ui.wrapped(foot.toString(), Theme.small(), Theme.TEXT_FAINT, WIDTH - 16));
 		replace(goal, stack);
 	}
@@ -460,7 +465,7 @@ public class PilotPanel extends PluginPanel
 			}
 		}
 		List<Outlook.Milestone> steps = o.milestones(locked);
-		stack.add(new SectionHeader("Buy order", "cheapest first"));
+		stack.add(new SectionHeader("Buy order", "as points come"));
 		Card card = new Card(new BorderLayout());
 		StackPanel rows = new StackPanel(0, 0);
 		for (int i = 0; i < steps.size(); i++)

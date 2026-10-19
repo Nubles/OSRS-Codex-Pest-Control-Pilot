@@ -36,6 +36,8 @@ public final class View
 		final int crowd;
 		/** Seconds until it falls at the team's pace, Battle.STALLED when not being worn down, -1 when not known. */
 		final int eta;
+		/** Whether only your hits are wearing it down, so its stalled team pace is no fault of yours. */
+		final boolean yoursAlone;
 
 		/** @param crowd other players at it, or -1 when not seen */
 		public PortalState(Portal portal, boolean shielded, boolean fallen, int health, int crowd)
@@ -45,6 +47,12 @@ public final class View
 
 		public PortalState(Portal portal, boolean shielded, boolean fallen, int health, int crowd, int eta)
 		{
+			this(portal, shielded, fallen, health, crowd, eta, false);
+		}
+
+		public PortalState(Portal portal, boolean shielded, boolean fallen, int health, int crowd, int eta, boolean yoursAlone)
+		{
+			this.yoursAlone = yoursAlone;
 			this.eta = eta;
 			this.portal = portal;
 			this.shielded = shielded;

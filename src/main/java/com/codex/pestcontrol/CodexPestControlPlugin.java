@@ -872,7 +872,7 @@ public class CodexPestControlPlugin extends Plugin
 			{
 				Integer crowd = field.crowdAt(p);
 				states.add(new View.PortalState(p, battle.isShielded(p), battle.isFallen(p), battle.getHealth(p), crowd == null ? -1 : crowd,
-					battle.secondsToFall(p)));
+					battle.secondsToFall(p), battle.isYoursAlone(p)));
 			}
 			fight = new View.Fight(states, advice, battle.getKnightHealth(), battle.getDamage(), battle.expectedOrder(),
 				battle.getPossible().size(), (int) Math.round(battle.getTicks() * 0.6), activity(), battle.secondsToNextDrop(logbook.getClock()));
