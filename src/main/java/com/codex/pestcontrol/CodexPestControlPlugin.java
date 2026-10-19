@@ -6,6 +6,7 @@ import com.codex.pestcontrol.core.Boat;
 import com.codex.pestcontrol.core.Experience;
 import com.codex.pestcontrol.core.Field;
 import com.codex.pestcontrol.core.GameRecord;
+import com.codex.pestcontrol.core.GameSummary;
 import com.codex.pestcontrol.core.Goal;
 import com.codex.pestcontrol.core.Landers;
 import com.codex.pestcontrol.core.Logbook;
@@ -636,63 +637,19 @@ public class CodexPestControlPlugin extends Plugin
 		return out;
 	}
 
-	/**
-	 * A line in the chat box after a game: what it gave, how far the goal is, and the sitting's
-	 * points an hour with the lander time counted. Warns when the points near the cap the knights hold.
-	 */
+	/** A line in the chat box after a game; see {@link GameSummary}. */
 	private void summarise(GameRecord game, Outlook after)
 	{
-		if (!config.gameSummary() || game.getResult() == GameRecord.Result.LEFT)
+		String text = config.gameSummary() ? GameSummary.of(game, after, Sitting.latest(logbook.getGames(), game.getEnded())) : null;
+		if (text == null)
 		{
 			return;
 		}
-		StringBuilder text = new StringBuilder();
-		switch (game.getResult())
-		{
-			case WON:
-				text.append("won, +").append(game.getPoints()).append(game.getPoints() == 1 ? " point" : " points");
-				break;
-			case NO_POINTS:
-				text.append("won, but no points: ").append(game.getDamage()).append(" of the 50 damage needed");
-				break;
-			default:
-				text.append("lost");
-				break;
-		}
-		if (game.getResult() != GameRecord.Result.NO_POINTS)
-		{
-			text.append(", ").append(game.getDamage()).append(" damage");
-		}
-		if (after != null && after.isPointsKnown())
-		{
-			if (!after.isComplete() && !after.isAffordable())
-			{
-				text.append(". ").append(Format.number(after.getPoints())).append(" of ").append(Format.number(after.getCost()))
-					.append(" points for your goal, about ").append(Format.plural(after.getGames(), "game", "games")).append(" to go");
-			}
-			if (after.getPoints() >= Logbook.POINTS_CAP - 50)
-			{
-				text.append(". You hold ").append(Format.number(after.getPoints())).append(" of the ")
-					.append(Format.number(Logbook.POINTS_CAP)).append(" points the knights will keep: spend some");
-			}
-		}
-		Sitting sitting = Sitting.latest(logbook.getGames(), game.getEnded());
-		if (sitting.getGames().size() >= 2)
-		{
-			text.append(". This sitting: ").append(Format.plural(sitting.getGames().size(), "game", "games")).append(", ")
-				.append(Format.number(sitting.getPoints())).append(" points");
-			if (sitting.pointsPerHour() > 0)
-			{
-				text.append(", ").append(sitting.pointsPerHour()).append(" an hour");
-			}
-		}
-		text.append(".");
-		text.setCharAt(0, Character.toUpperCase(text.charAt(0)));
 		chatMessageManager.queue(QueuedMessage.builder()
 			.type(ChatMessageType.CONSOLE)
 			.runeLiteFormattedMessage(new ChatMessageBuilder()
 				.append(ChatColorType.HIGHLIGHT).append("Codex Pest Control Pilot: ")
-				.append(ChatColorType.NORMAL).append(text.toString())
+				.append(ChatColorType.NORMAL).append(text)
 				.build())
 			.build());
 	}
