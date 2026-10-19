@@ -81,4 +81,35 @@ public class VoidCheckTest
 	{
 		assertNull(VoidCheck.of(EnumSet.of(Reward.SEAL, Reward.MACE), Style.MELEE, NONE));
 	}
+
+	/** Every reward an item id counts as, the way the plugin reads the worn items. */
+	private static Set<Reward> worn(int... ids)
+	{
+		Set<Reward> out = EnumSet.noneOf(Reward.class);
+		for (int id : ids)
+		{
+			for (Reward r : Reward.values())
+			{
+				if (r.isOwnedBy(id))
+				{
+					out.add(r);
+				}
+			}
+		}
+		return out;
+	}
+
+	@Test
+	public void ornamentedVoidFromTheShatteredRelicsKitCountsAsVoid()
+	{
+		// Void knight top, robe, gloves (or) and the void ranger helm (or): a full set bonus in game.
+		Set<Reward> or = worn(26463, 26465, 26467, 26475);
+		VoidCheck c = VoidCheck.of(or, Style.RANGED, or);
+		assertEquals(VoidCheck.Kind.SET_ON, c.getKind());
+		// Elite top and robe (or), mage helm (or), the trouver-locked gloves (or).
+		Set<Reward> elite = worn(26469, 26471, 27002, 26473);
+		assertEquals("Elite void on", VoidCheck.of(elite, Style.MAGIC, elite).getHeadline());
+		// The melee helm (or) locked with Perdu's trouver parchment.
+		assertTrue(Reward.MELEE_HELM.isOwnedBy(27007));
+	}
 }
