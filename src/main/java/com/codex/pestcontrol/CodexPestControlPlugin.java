@@ -11,6 +11,7 @@ import com.codex.pestcontrol.core.Logbook;
 import com.codex.pestcontrol.core.Outlook;
 import com.codex.pestcontrol.core.Portal;
 import com.codex.pestcontrol.core.Reward;
+import com.codex.pestcontrol.core.SharedBank;
 import com.codex.pestcontrol.core.Style;
 import com.codex.pestcontrol.overlay.MinimapMarker;
 import com.codex.pestcontrol.overlay.PilotPlaque;
@@ -90,8 +91,6 @@ public class CodexPestControlPlugin extends Plugin
 	private static final Logger log = LoggerFactory.getLogger(CodexPestControlPlugin.class);
 	private static final String LOGBOOK_KEY = "logbook";
 	/** Codex Gear Roadmap keeps the bank it last saw here (item ids); read only, and only when that plugin has saved one. */
-	private static final String GEAR_ROADMAP_GROUP = "codexgearroadmap";
-	private static final String GEAR_ROADMAP_BANK = "bank";
 	/** The Void Knights' Outpost island. */
 	private static final int OUTPOST_REGION = 10537;
 	/** Ticks after a game's status bar goes for its closing messages to arrive. */
@@ -188,7 +187,9 @@ public class CodexPestControlPlugin extends Plugin
 	private Logbook logbook;
 	private Set<Reward> carriedOwned = EnumSet.noneOf(Reward.class);
 	/** Rewards in the bank as Codex Gear Roadmap last saved it, or null when it has saved none. Used until this plugin sees the bank. */
-	private Set<Reward> roadmapOwned;
+	private SharedBank shared;
+	/** The rewards in {@link #shared}, worked out once per read. */
+	private Set<Reward> sharedOwned = EnumSet.noneOf(Reward.class);
 	private Battle battle;
 	/** A game whose status bar has gone, waiting a few ticks for its closing messages. */
 	private Battle ending;
@@ -312,6 +313,19 @@ public class CodexPestControlPlugin extends Plugin
 		if (CodexPestControlConfig.GROUP.equals(event.getGroup()))
 		{
 			dirty = true;
+		}
+		else if (SharedBank.STEWARD_GROUP.equals(event.getGroup()) && SharedBank.STEWARD_KEY.equals(event.getKey())
+			|| SharedBank.ROADMAP_GROUP.equals(event.getGroup()) && SharedBank.ROADMAP_KEY.equals(event.getKey()))
+		{
+			// Another Codex plugin saved the bank; it only counts for the profile in hand.
+			clientThread.invokeLater(() ->
+			{
+				if (profile != null && profile.equals(configManager.getRSProfileKey()) && logbook != null)
+				{
+					readShared();
+					dirty = true;
+				}
+			});
 		}
 	}
 
@@ -709,51 +723,46 @@ public class CodexPestControlPlugin extends Plugin
 		return out;
 	}
 
-	/** The shape Codex Gear Roadmap saves its bank in; only the item ids are read. */
-	private static final class SavedBank
+	/**
+	 * The bank another Codex plugin last saved for this profile: Codex Bank Steward's full bank,
+	 * else Codex Gear Roadmap's gear, else null.
+	 */
+	private SharedBank readSharedBank()
 	{
-		List<Integer> items;
+		return SharedBank.read(gson,
+			configManager.getRSProfileConfiguration(SharedBank.STEWARD_GROUP, SharedBank.STEWARD_KEY),
+			configManager.getRSProfileConfiguration(SharedBank.ROADMAP_GROUP, SharedBank.ROADMAP_KEY));
 	}
 
-	/** The void pieces in Codex Gear Roadmap's saved bank, or null when that plugin is not installed or has not seen the bank. */
-	private Set<Reward> readRoadmapBank()
+	private void readShared()
 	{
-		try
+		shared = readSharedBank();
+		sharedOwned = shared == null ? EnumSet.noneOf(Reward.class) : owned(shared);
+	}
+
+	/** The rewards in a shared bank. */
+	private static Set<Reward> owned(SharedBank bank)
+	{
+		Set<Reward> out = EnumSet.noneOf(Reward.class);
+		for (int id : bank.ids())
 		{
-			String json = configManager.getRSProfileConfiguration(GEAR_ROADMAP_GROUP, GEAR_ROADMAP_BANK);
-			if (json == null || json.isEmpty())
+			for (Reward r : Reward.values())
 			{
-				return null;
-			}
-			SavedBank bank = gson.fromJson(json, SavedBank.class);
-			if (bank == null || bank.items == null)
-			{
-				return null;
-			}
-			Set<Reward> out = EnumSet.noneOf(Reward.class);
-			for (Integer id : bank.items)
-			{
-				for (Reward r : Reward.values())
+				if (r.isOwnedBy(id))
 				{
-					if (id != null && r.isOwnedBy(id))
-					{
-						out.add(r);
-					}
+					out.add(r);
 				}
 			}
-			return out;
 		}
-		catch (JsonParseException e)
-		{
-			return null;
-		}
+		return out;
 	}
 
 	private void loadProfile()
 	{
 		profile = configManager.getRSProfileKey();
 		logbook = null;
-		roadmapOwned = null;
+		shared = null;
+		sharedOwned = EnumSet.noneOf(Reward.class);
 		if (profile == null)
 		{
 			return;
@@ -775,7 +784,7 @@ public class CodexPestControlPlugin extends Plugin
 		{
 			logbook = new Logbook();
 		}
-		roadmapOwned = readRoadmapBank();
+		readShared();
 		unsaved = false;
 		dirty = true;
 	}
@@ -793,18 +802,18 @@ public class CodexPestControlPlugin extends Plugin
 	private Set<Reward> owned()
 	{
 		Set<Reward> owned = logbook.getOwned();
-		if (fromRoadmap())
+		if (fromSharedBank())
 		{
-			owned.addAll(roadmapOwned);
+			owned.addAll(sharedOwned);
 		}
 		owned.addAll(carriedOwned);
 		return owned;
 	}
 
-	/** Whether the owned pieces come from Codex Gear Roadmap's bank, this plugin not having seen the bank yet. */
-	private boolean fromRoadmap()
+	/** Whether the owned pieces come from another Codex plugin's saved bank, this plugin not having seen the bank yet. */
+	private boolean fromSharedBank()
 	{
-		return logbook.getOwnedSeen() == 0 && roadmapOwned != null;
+		return logbook.getOwnedSeen() == 0 && shared != null;
 	}
 
 	private Boat estimateBoat()
@@ -985,9 +994,9 @@ public class CodexPestControlPlugin extends Plugin
 		GameRecord last = games.isEmpty() ? null : games.get(games.size() - 1);
 		Player me = client.getLocalPlayer();
 		View view = new View(state, me == null ? null : me.getName(), fight, last, outlook, goal, owned(), Goal.matching(goal),
-			estimateBoat(), logbook.getOwnedSeen() > 0 || fromRoadmap(), missing, elite, logbook.getPlayed(), logbook.getWon(), logbook.getEarned(),
+			estimateBoat(), logbook.getOwnedSeen() > 0 || fromSharedBank(), missing, elite, logbook.getPlayed(), logbook.getWon(), logbook.getEarned(),
 			logbook.getSeconds(), games, now);
-		view.ownedFromRoadmap = fromRoadmap();
+		view.ownedFrom = fromSharedBank() ? shared.getSource() : null;
 		view.landers = Landers.of(games);
 		view.combat = me == null ? 0 : me.getCombatLevel();
 		return view;

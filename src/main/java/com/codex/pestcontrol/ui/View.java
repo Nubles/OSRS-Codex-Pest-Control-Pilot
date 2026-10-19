@@ -8,6 +8,7 @@ import com.codex.pestcontrol.core.Landers;
 import com.codex.pestcontrol.core.Outlook;
 import com.codex.pestcontrol.core.Portal;
 import com.codex.pestcontrol.core.Reward;
+import com.codex.pestcontrol.core.SharedBank;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
@@ -119,8 +120,8 @@ public final class View
 	final long seconds;
 	final List<GameRecord> games;
 	final long now;
-	/** Whether the pieces owned were read from Codex Gear Roadmap's saved bank. */
-	public boolean ownedFromRoadmap;
+	/** The Codex plugin whose saved bank the pieces owned were read from, or null when from this plugin's own look. */
+	public SharedBank.Source ownedFrom;
 	/** Each lander's figures from your games. */
 	public List<Landers.Line> landers = Collections.emptyList();
 	/** Your combat level, 0 when not known. */

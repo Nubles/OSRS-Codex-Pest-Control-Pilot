@@ -8,6 +8,7 @@ import com.codex.pestcontrol.core.Landers;
 import com.codex.pestcontrol.core.Outlook;
 import com.codex.pestcontrol.core.Portal;
 import com.codex.pestcontrol.core.Reward;
+import com.codex.pestcontrol.core.SharedBank;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
@@ -181,7 +182,7 @@ public class PilotPanel extends PluginPanel
 		Outlook o = view.outlook;
 		return view.state.name().equals("LOGGED_OUT") + "|" + view.goal + "|" + view.owned + "|" + view.ownedKnown + "|" + view.missing + "|" + view.elite
 			+ "|" + (o == null ? "-" : o.getPoints() + "/" + o.getPerGame() + "/" + Math.round(o.getMinutes())) + "|" + view.boat
-			+ "|" + view.games.size() + "|" + view.ownedFromRoadmap + "|" + view.combat + "|" + view.now / 60_000L;
+			+ "|" + view.games.size() + "|" + view.ownedFrom + "|" + view.combat + "|" + view.now / 60_000L;
 	}
 
 	private boolean loggedOut(StackPanel stack)
@@ -435,9 +436,10 @@ public class PilotPanel extends PluginPanel
 			foot.append("Assumes won ").append(view.boat == null ? "" : view.boat.getTitle().toLowerCase(Locale.ENGLISH) + " ")
 				.append("games until three of yours are measured");
 		}
-		foot.append(view.ownedFromRoadmap ? ". Pieces in your bank, as Codex Gear Roadmap last saw it, count as owned."
+		foot.append(view.ownedFrom == SharedBank.Source.BANK_STEWARD ? ". Pieces in your bank, as Codex Bank Steward last saw it, count as owned."
+			: view.ownedFrom == SharedBank.Source.GEAR_ROADMAP ? ". Pieces in your bank, as Codex Gear Roadmap last saw it, count as owned."
 			: view.ownedKnown ? ". Pieces in your bank count as owned." : ". Open your bank so pieces you own are not counted.");
-		if (view.ownedFromRoadmap && view.goal.contains(Reward.SEAL) && !view.owned.contains(Reward.SEAL))
+		if (view.ownedFrom == SharedBank.Source.GEAR_ROADMAP && view.goal.contains(Reward.SEAL) && !view.owned.contains(Reward.SEAL))
 		{
 			// Codex Gear Roadmap saves only the gear it ranks, and a void seal is not gear to it.
 			foot.append(" It does not keep void seals, so open your bank once to count yours.");
