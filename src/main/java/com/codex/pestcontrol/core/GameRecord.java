@@ -13,6 +13,11 @@ public class GameRecord
 		LEFT
 	}
 
+	/** The most points one game gives: a won veteran game, with room to spare. */
+	public static final int MAX_POINTS = 100;
+	/** No game lasts longer than its twenty minutes. */
+	static final int MAX_SECONDS = 20 * 60;
+
 	private long ended;
 	private String boat;
 	private String result;
@@ -69,5 +74,14 @@ public class GameRecord
 	public int getSeconds()
 	{
 		return seconds;
+	}
+
+	/** Brings figures a damaged save holds out of range back into it. */
+	void repair()
+	{
+		ended = Math.max(0, ended);
+		points = Math.max(0, Math.min(points, MAX_POINTS));
+		damage = Math.max(0, damage);
+		seconds = Math.max(0, Math.min(seconds, MAX_SECONDS));
 	}
 }

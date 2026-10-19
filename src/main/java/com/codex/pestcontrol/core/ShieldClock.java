@@ -46,7 +46,9 @@ public class ShieldClock
 		{
 			return -1;
 		}
-		return (int) Math.round(sums[step] / (double) counts[step]);
+		long gap = Math.round(sums[step] / (double) counts[step]);
+		// Only a damaged save gives an average no single gap could.
+		return gap < MIN_GAP || gap > MAX_GAP ? -1 : (int) gap;
 	}
 
 	public int samples(int step)
@@ -55,7 +57,8 @@ public class ShieldClock
 		return step < 0 || step >= 4 ? 0 : counts[step];
 	}
 
-	private void repair()
+	/** Fills in what a damaged save left out; a step with a count or sum below zero starts again. */
+	void repair()
 	{
 		if (sums == null || sums.length != 4)
 		{
@@ -64,6 +67,14 @@ public class ShieldClock
 		if (counts == null || counts.length != 4)
 		{
 			counts = new int[4];
+		}
+		for (int i = 0; i < 4; i++)
+		{
+			if (sums[i] < 0 || counts[i] < 0)
+			{
+				sums[i] = 0;
+				counts[i] = 0;
+			}
 		}
 	}
 }

@@ -4,9 +4,11 @@ import com.codex.pestcontrol.core.Advice;
 import com.codex.pestcontrol.core.Boat;
 import com.codex.pestcontrol.core.GameRecord;
 import com.codex.pestcontrol.core.Goal;
+import com.codex.pestcontrol.core.Landers;
 import com.codex.pestcontrol.core.Outlook;
 import com.codex.pestcontrol.core.Portal;
 import com.codex.pestcontrol.core.Reward;
+import com.codex.pestcontrol.core.SharedBank;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
@@ -33,10 +35,26 @@ public final class View
 		final boolean fallen;
 		final int health;
 		final int crowd;
+		/** Seconds until it falls at the team's pace, Battle.STALLED when not being worn down, -1 when not known. */
+		final int eta;
+		/** Whether only your hits are wearing it down, so its stalled team pace is no fault of yours. */
+		final boolean yoursAlone;
 
 		/** @param crowd other players at it, or -1 when not seen */
 		public PortalState(Portal portal, boolean shielded, boolean fallen, int health, int crowd)
 		{
+			this(portal, shielded, fallen, health, crowd, -1);
+		}
+
+		public PortalState(Portal portal, boolean shielded, boolean fallen, int health, int crowd, int eta)
+		{
+			this(portal, shielded, fallen, health, crowd, eta, false);
+		}
+
+		public PortalState(Portal portal, boolean shielded, boolean fallen, int health, int crowd, int eta, boolean yoursAlone)
+		{
+			this.yoursAlone = yoursAlone;
+			this.eta = eta;
 			this.portal = portal;
 			this.shielded = shielded;
 			this.fallen = fallen;
@@ -102,6 +120,25 @@ public final class View
 	final long seconds;
 	final List<GameRecord> games;
 	final long now;
+	/** The Codex plugin whose saved bank the pieces owned were read from, or null when from this plugin's own look. */
+	public SharedBank.Source ownedFrom;
+	/** Each lander's figures from your games. */
+	public List<Landers.Line> landers = Collections.emptyList();
+	/** Your combat level, 0 when not known. */
+	public int combat;
+	/** The sitting in hand, or the last one; null or empty with no games. */
+	public com.codex.pestcontrol.core.Sitting sitting;
+	/** What the void worn now does for the weapon in hand, outside a game; null when there is nothing to say. */
+	public com.codex.pestcontrol.core.VoidCheck voidCheck;
+	/** Real levels in {@link com.codex.pestcontrol.core.Experience.Skill} order, or null when logged out. */
+	public int[] levels;
+	/** Experience in the same order, or null when logged out. */
+	public long[] xp;
+	/** The levels Codex Navigator's pinned goals need in those skills; empty without Navigator. */
+	public List<com.codex.pestcontrol.core.NavigatorGoals.Need> goals = Collections.emptyList();
+
+	/** Whether the void card names the player; off to share it without the name. */
+	public boolean nameOnCard = true;
 
 	/**
 	 * @param fight the game in progress, or null

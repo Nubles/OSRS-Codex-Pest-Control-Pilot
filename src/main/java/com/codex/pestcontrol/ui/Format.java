@@ -1,6 +1,9 @@
 package com.codex.pestcontrol.ui;
 
 import java.text.NumberFormat;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
 /** Numbers and times written the way the panel shows them. */
@@ -68,5 +71,13 @@ public final class Format
 	public static String plural(long n, String one, String many)
 	{
 		return number(n) + " " + (n == 1 ? one : many);
+	}
+
+	private static final DateTimeFormatter SHORT_DAY = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH);
+
+	/** "16 Oct". */
+	public static String shortDay(long epochMs)
+	{
+		return SHORT_DAY.format(Instant.ofEpochMilli(epochMs).atZone(ZoneId.systemDefault()));
 	}
 }

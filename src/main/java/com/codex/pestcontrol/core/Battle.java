@@ -20,6 +20,14 @@ public class Battle
 	private static final int QUIETER_BY = 6;
 	/** Below this activity, waiting time is better spent on a barricade. */
 	private static final int LOW_ACTIVITY = 30;
+	/** The team's pace at a portal is measured over this many ticks, about ten seconds. */
+	static final int PACE_WINDOW = 17;
+	/** Ticks of readings needed before a pace is trusted. */
+	static final int PACE_MIN = 6;
+	/** A portal falling this many seconds later than the weakest holds the game up enough to go there instead. */
+	private static final int LATER_BY = 12;
+	/** Seconds shown for a portal the team is not wearing down at all. */
+	public static final int STALLED = Integer.MAX_VALUE;
 
 	private final boolean[] shielded = {true, true, true, true};
 	private final boolean[] fallen = new boolean[4];
@@ -30,6 +38,21 @@ public class Battle
 	private int knightHealth = -1;
 	private int damage;
 	private int ticks;
+	/** Each portal's health readings over the pace window: {tick, health}, oldest first. */
+	private final List<List<int[]>> readings = new ArrayList<>();
+	/** Your own hits on each portal over the pace window: {tick, damage}. */
+	private final List<List<int[]>> ownHits = new ArrayList<>();
+	/** The portal last sent to once points were earned, held unless another clearly holds the game up more. */
+	private Portal holding;
+
+	public Battle()
+	{
+		for (int i = 0; i < 4; i++)
+		{
+			readings.add(new ArrayList<>());
+			ownHits.add(new ArrayList<>());
+		}
+	}
 
 	/** A portal's shield has dropped just now, by its message or by the portal changing. Repeats are ignored. */
 	public void shieldDropped(Portal portal)
@@ -50,6 +73,9 @@ public class Battle
 			return;
 		}
 		shielded[portal.ordinal()] = false;
+		// Readings from behind the shield would make a portal the team has only just reached look stalled.
+		readings.get(portal.ordinal()).clear();
+		ownHits.get(portal.ordinal()).clear();
 		int step = drops.size();
 		drops.add(portal);
 		dropTicks.add(at);
@@ -72,6 +98,16 @@ public class Battle
 	public void setHealth(Portal portal, int hp)
 	{
 		health[portal.ordinal()] = hp;
+		List<int[]> r = readings.get(portal.ordinal());
+		if (!r.isEmpty() && r.get(r.size() - 1)[0] == ticks)
+		{
+			r.get(r.size() - 1)[1] = hp;
+		}
+		else
+		{
+			r.add(new int[]{ticks, hp});
+		}
+		trim(r);
 		if (hp == 0)
 		{
 			fall(portal);
@@ -92,10 +128,85 @@ public class Battle
 
 	public void addDamage(int amount)
 	{
-		if (amount > 0)
+		addDamage(amount, null);
+	}
+
+	/** One of your hitsplats; on a portal it is kept apart so the team's own pace there can be told from yours. */
+	public void addDamage(int amount, Portal on)
+	{
+		if (amount <= 0)
 		{
-			damage += amount;
+			return;
 		}
+		damage += amount;
+		if (on != null)
+		{
+			List<int[]> hits = ownHits.get(on.ordinal());
+			hits.add(new int[]{ticks, amount});
+			trim(hits);
+		}
+	}
+
+	private void trim(List<int[]> samples)
+	{
+		while (!samples.isEmpty() && samples.get(0)[0] < ticks - PACE_WINDOW)
+		{
+			samples.remove(0);
+		}
+	}
+
+	/**
+	 * Seconds until the open portal falls at the pace the rest of the team is wearing it down,
+	 * leaving your own hits out; {@link #STALLED} when they are not wearing it down at all, or
+	 * -1 when it is not open or has not been watched long enough to tell.
+	 */
+	public int secondsToFall(Portal portal)
+	{
+		int i = portal.ordinal();
+		if (shielded[i] || fallen[i])
+		{
+			return -1;
+		}
+		List<int[]> r = readings.get(i);
+		trim(r);
+		if (r.size() < 2)
+		{
+			return -1;
+		}
+		int[] first = r.get(0);
+		int[] last = r.get(r.size() - 1);
+		int span = last[0] - first[0];
+		if (span < PACE_MIN || last[1] <= 0)
+		{
+			return -1;
+		}
+		// A hit stamped with a tick lands after that tick's reading, so it shows from the next one on.
+		int mine = 0;
+		for (int[] hit : ownHits.get(i))
+		{
+			if (hit[0] >= first[0] && hit[0] < last[0])
+			{
+				mine += hit[1];
+			}
+		}
+		double perTick = (first[1] - last[1] - mine) / (double) span;
+		if (perTick <= 0.05)
+		{
+			return STALLED;
+		}
+		return (int) Math.ceil(last[1] / perTick * 0.6);
+	}
+
+	/**
+	 * Whether you are the only one wearing the open portal down: your hits have landed on it lately
+	 * but, leaving them out, its health is not falling. Its pace then reads as stalled, which is the
+	 * team's pace, not yours.
+	 */
+	public boolean isYoursAlone(Portal portal)
+	{
+		List<int[]> hits = ownHits.get(portal.ordinal());
+		trim(hits);
+		return !hits.isEmpty() && secondsToFall(portal) == STALLED;
 	}
 
 	public void tick()
@@ -260,7 +371,14 @@ public class Battle
 			Portal weakest = weakest(open);
 			Portal target = pick(open, weakest, f);
 			boolean quieter = target != weakest && quieter(target, weakest, f);
-			String detail = attackDetail(target, quieter, f);
+			Portal slowest = hasPoints() ? holdingUp(open, target) : null;
+			holding = slowest;
+			if (slowest != null)
+			{
+				target = slowest;
+				quieter = false;
+			}
+			String detail = slowest != null ? slowestDetail(slowest, f) : attackDetail(target, quieter, f);
 			if (knightLow)
 			{
 				detail = "Knight at " + knightHealth + " health. " + detail;
@@ -297,6 +415,79 @@ public class Battle
 			detail += ". Repair a barricade meanwhile to raise your activity";
 		}
 		return new Advice(Advice.Kind.WAIT, null, next, "Hold by the knight", detail);
+	}
+
+	/**
+	 * Once your points are earned the game ends when the last portal falls, so the open portal
+	 * the team is wearing down slowest is where your hits shorten it most. Returns it when it falls
+	 * clearly later than the portal otherwise picked, else null. The last pick is held while it is
+	 * still close to the slowest, so the advice does not flicker between two portals.
+	 */
+	private Portal holdingUp(List<Portal> open, Portal picked)
+	{
+		if (open.size() < 2)
+		{
+			return null;
+		}
+		Portal slowest = null;
+		int slowestEta = -1;
+		for (Portal p : open)
+		{
+			int eta = secondsToFall(p);
+			if (eta < 0)
+			{
+				// Not every open portal is measured yet: no fair comparison.
+				return null;
+			}
+			if (eta > slowestEta || eta == slowestEta && rank(health[p.ordinal()]) > rank(health[slowest.ordinal()]))
+			{
+				slowest = p;
+				slowestEta = eta;
+			}
+		}
+		if (holding != null && open.contains(holding) && holding != slowest)
+		{
+			int held = secondsToFall(holding);
+			if (held == STALLED || slowestEta != STALLED && slowestEta - held < LATER_BY)
+			{
+				return holding;
+			}
+		}
+		if (slowest == picked)
+		{
+			return slowestEta == STALLED || slowestEta >= LATER_BY ? slowest : null;
+		}
+		int pickedEta = secondsToFall(picked);
+		boolean later = slowestEta == STALLED ? pickedEta != STALLED : slowestEta - pickedEta >= LATER_BY && slowestEta >= pickedEta * 3 / 2;
+		return later ? slowest : null;
+	}
+
+	private String slowestDetail(Portal p, Field f)
+	{
+		int spinning = f.spinners.getOrDefault(p, 0);
+		String lead;
+		int eta = secondsToFall(p);
+		if (eta == STALLED)
+		{
+			Integer crowd = f.crowdAt(p);
+			if (isYoursAlone(p))
+			{
+				lead = "Only you are wearing it down: it holds the game up";
+			}
+			else
+			{
+				lead = crowd != null && crowd == 0 ? "Nobody is there: it holds the game up" : "The team is not wearing it down: it holds the game up";
+			}
+		}
+		else
+		{
+			lead = "Falls last at the team's pace, in about " + eta + "s";
+		}
+		if (spinning > 0)
+		{
+			return lead + ". Kill the " + (spinning == 1 ? "spinner" : spinning + " spinners") + " healing it first";
+		}
+		return lead + ". Your points are earned, so your hits end the game sooner here";
 	}
 
 	/** What to say about the portal to attack: what stands in the way first, then why this one. */

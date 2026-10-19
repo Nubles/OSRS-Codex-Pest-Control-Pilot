@@ -46,6 +46,8 @@ class RewardRow extends JComponent
 	private final Standing standing;
 	private final String note;
 	private final ItemIcons icons;
+	/** Handed over each time an icon is asked for, so a row waiting on a picture is told once. */
+	private final Runnable repaint = this::repaint;
 	private boolean hover;
 
 	/** @param note a quiet line under the price, such as what it needs, or null */
@@ -108,7 +110,7 @@ class RewardRow extends JComponent
 		g.setColor(hover ? Theme.alpha(Theme.GOLD, 90) : Theme.STROKE_SOFT);
 		g.draw(shape);
 
-		BufferedImage icon = icons.get(reward.getIcon(), this::repaint);
+		BufferedImage icon = icons.get(reward.getIcon(), repaint);
 		Well.paint(g, 6, (h - Well.SIZE) / 2, icon, inGoal ? Theme.alpha(standing.color, 90) : null, !inGoal && !hover);
 
 		int tx = 6 + Well.SIZE + 4 + 8;

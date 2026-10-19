@@ -122,18 +122,30 @@ public class Crest extends JComponent
 		g.setColor(Theme.TEXT_MUTED);
 		g.drawString(Ui.clip(heading, small, room), tx, 22);
 
-		String figure = !known ? "-" : Format.number(Math.round(count.get()));
 		int top = 27;
-		int figureW = paintLarge(g, figure, tx, top, known ? figureTint : Theme.GOLD_DIM);
-		if (known && !unit.isEmpty())
-		{
-			g.setFont(Theme.small());
-			g.setColor(Theme.GOLD_DIM);
-			g.drawString(Ui.clip(unit, small, Math.max(0, room - figureW - 3)), tx + figureW + 3, top + 18);
-		}
 		int cy = top + 50;
+		if (!known)
+		{
+			// No points read yet: what to do takes the figure's place rather than a lone dash.
+			String line = shortStatus != null && g.getFontMetrics(Theme.body()).stringWidth(status) > room ? shortStatus : status;
+			g.setFont(Theme.body());
+			Ui.shadowed(g, Ui.clip(line == null ? "" : line, g.getFontMetrics(), room), tx, top + 18, Theme.mix(Theme.TEXT_MUTED, Theme.GOLD, 0.45));
+			g.setFont(Theme.small());
+			g.setColor(Theme.TEXT_FAINT);
+			g.drawString(Ui.clip("Commendation points", small, room), tx, top + 34);
+		}
+		else
+		{
+			int figureW = paintLarge(g, Format.number(Math.round(count.get())), tx, top, figureTint);
+			if (!unit.isEmpty())
+			{
+				g.setFont(Theme.small());
+				g.setColor(Theme.GOLD_DIM);
+				g.drawString(Ui.clip(unit, small, Math.max(0, room - figureW - 3)), tx + figureW + 3, top + 18);
+			}
+		}
 		g.setFont(Theme.small());
-		if (status != null)
+		if (status != null && known)
 		{
 			String line = shortStatus != null && small.stringWidth(status) > room ? shortStatus : status;
 			Ui.shadowed(g, Ui.clip(line, small, room), tx, cy, statusColor);

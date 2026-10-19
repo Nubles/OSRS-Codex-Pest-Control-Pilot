@@ -8,7 +8,9 @@ import java.awt.Dimension;
 import java.awt.FontMetrics;
 import java.awt.GradientPaint;
 import java.awt.Graphics2D;
+import java.awt.Shape;
 import java.awt.geom.RoundRectangle2D;
+import java.awt.image.BufferedImage;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayPosition;
 
@@ -36,6 +38,13 @@ public class PilotPlaque extends Overlay
 		final String detail;
 		final String foot;
 		final Color footColor;
+		/** The layout, worked out on the first frame this is shown and kept, so a frame measures and allocates nothing. */
+		private java.util.List<String> lines;
+		private int width;
+		private int height;
+		private RoundRectangle2D shape;
+		private GradientPaint fill;
+		private GradientPaint edge;
 
 		/**
 		 * @param kicker the small capitals above, such as "WORK NEXT"
@@ -83,33 +92,26 @@ public class PilotPlaque extends Overlay
 		g.setFont(Theme.small());
 		FontMetrics small = g.getFontMetrics();
 
-		java.util.List<String> detail = wrap(s.detail, small, MAX_TEXT);
-		int textW = Math.max(bold.stringWidth(s.headline), small.stringWidth(s.kicker));
-		for (String line : detail)
+		if (s.lines == null)
 		{
-			textW = Math.max(textW, small.stringWidth(line));
+			layout(s, bold, small);
 		}
-		if (s.foot != null)
-		{
-			textW = Math.max(textW, small.stringWidth(s.foot));
-		}
-		int width = Math.max(MIN_WIDTH, PAD + ICON + 8 + textW + PAD + 2);
-		int lines = 2 + detail.size() + (s.foot != null ? 1 : 0);
-		int height = PAD + small.getHeight() + bold.getHeight() + (lines - 2) * small.getHeight() + PAD - 2;
-
-		RoundRectangle2D shape = new RoundRectangle2D.Float(0.5f, 0.5f, width - 1, height - 1, 12, 12);
-		g.setPaint(new GradientPaint(0, 0, Theme.alpha(Theme.CARD_TOP, 236), 0, height, Theme.alpha(Theme.INK_DEEP, 236)));
-		g.fill(shape);
-		g.setClip(shape);
-		g.setPaint(new GradientPaint(0, 0, s.color, 0, height, Theme.alpha(s.color, 70)));
+		java.util.List<String> detail = s.lines;
+		int width = s.width;
+		int height = s.height;
+		g.setPaint(s.fill);
+		g.fill(s.shape);
+		Shape clip = g.getClip();
+		g.clip(s.shape);
+		g.setPaint(s.edge);
 		g.fillRect(0, 0, 3, height);
-		g.setClip(null);
-		g.setColor(Theme.alpha(Theme.GOLD, 150));
-		g.draw(shape);
-		g.setColor(Theme.alpha(Color.WHITE, 14));
+		g.setClip(clip);
+		g.setColor(RIM);
+		g.draw(s.shape);
+		g.setColor(SHINE);
 		g.drawLine(8, 1, width - 8, 1);
 
-		Sigil.paint(g, PAD + 2, PAD + 2, ICON);
+		g.drawImage(MARK, PAD + 2, PAD + 2, null);
 		int x = PAD + ICON + 10;
 		int y = PAD + small.getAscent();
 		g.setFont(Theme.small());
@@ -129,6 +131,32 @@ public class PilotPlaque extends Overlay
 			Ui.shadowed(g, s.foot, x, y, s.footColor == null ? Theme.TEXT_MUTED : s.footColor);
 		}
 		return new Dimension(width, height);
+	}
+
+	private static final Color RIM = Theme.alpha(Theme.GOLD, 150);
+	private static final Color SHINE = Theme.alpha(Color.WHITE, 14);
+	/** The mark, drawn once. */
+	private static final BufferedImage MARK = Sigil.icon(ICON);
+
+	private static void layout(Shown s, FontMetrics bold, FontMetrics small)
+	{
+		java.util.List<String> detail = wrap(s.detail, small, MAX_TEXT);
+		int textW = Math.max(bold.stringWidth(s.headline), small.stringWidth(s.kicker));
+		for (String line : detail)
+		{
+			textW = Math.max(textW, small.stringWidth(line));
+		}
+		if (s.foot != null)
+		{
+			textW = Math.max(textW, small.stringWidth(s.foot));
+		}
+		s.width = Math.max(MIN_WIDTH, PAD + ICON + 8 + textW + PAD + 2);
+		int lines = 2 + detail.size() + (s.foot != null ? 1 : 0);
+		s.height = PAD + small.getHeight() + bold.getHeight() + (lines - 2) * small.getHeight() + PAD - 2;
+		s.shape = new RoundRectangle2D.Float(0.5f, 0.5f, s.width - 1, s.height - 1, 12, 12);
+		s.fill = new GradientPaint(0, 0, Theme.alpha(Theme.CARD_TOP, 236), 0, s.height, Theme.alpha(Theme.INK_DEEP, 236));
+		s.edge = new GradientPaint(0, 0, s.color, 0, s.height, Theme.alpha(s.color, 70));
+		s.lines = detail;
 	}
 
 	/** Breaks text into lines no wider than the width, at spaces. */

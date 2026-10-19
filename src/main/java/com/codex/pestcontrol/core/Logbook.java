@@ -14,6 +14,11 @@ public class Logbook
 {
 	/** Games kept one by one; older ones live on only in the totals. */
 	static final int KEEP = 60;
+	/**
+	 * A save at least this long is far bigger than any the pilot writes (60 games come to about
+	 * 6,000 characters) and takes long enough to read that it is read off the client thread.
+	 */
+	public static final int LARGE = 100_000;
 	/** Games the points-per-game average is taken over. */
 	static final int RECENT = 20;
 	/** A gap longer than this between two games is a break, not lander time. */
@@ -53,26 +58,52 @@ public class Logbook
 		return clock;
 	}
 
-	/** Fills in anything an older or damaged save left out. */
+	/**
+	 * Reads the logbook saved for an account, or a fresh one when there is none. A damaged save
+	 * keeps all it can: a field or game that cannot be read is lost alone.
+	 */
+	public static Logbook read(com.google.gson.Gson gson, String saved)
+	{
+		Logbook read = Salvage.read(gson, saved, Logbook.class);
+		return read == null ? new Logbook() : read.repair();
+	}
+
+	/** Fills in anything an older or damaged save left out, and brings back figures out of range. */
 	public Logbook repair()
 	{
 		if (goal == null)
 		{
 			goal = names(Goal.MELEE.getRewards());
 		}
+		goal.removeIf(n -> n == null);
 		if (owned == null)
 		{
 			owned = new ArrayList<>();
 		}
+		owned.removeIf(n -> n == null);
 		if (games == null)
 		{
 			games = new ArrayList<>();
 		}
 		games.removeIf(g -> g == null);
+		games.forEach(GameRecord::repair);
+		while (games.size() > KEEP)
+		{
+			games.remove(0);
+		}
 		if (clock == null)
 		{
 			clock = new ShieldClock();
 		}
+		clock.repair();
+		// The knights hold at most the cap; below zero is "not read yet".
+		points = points < 0 ? -1 : Math.min(points, POINTS_CAP);
+		pointsSeen = Math.max(0, pointsSeen);
+		ownedSeen = Math.max(0, ownedSeen);
+		played = Math.max(0, played);
+		won = Math.max(0, Math.min(won, played));
+		earned = Math.max(0, earned);
+		seconds = Math.max(0, seconds);
 		return this;
 	}
 
