@@ -126,6 +126,10 @@ public final class View
 	public List<Landers.Line> landers = Collections.emptyList();
 	/** Your combat level, 0 when not known. */
 	public int combat;
+	/** The sitting in hand, or the last one; null or empty with no games. */
+	public com.codex.pestcontrol.core.Sitting sitting;
+	/** Real levels in {@link com.codex.pestcontrol.core.Experience.Skill} order, or null when logged out. */
+	public int[] levels;
 
 	/**
 	 * @param fight the game in progress, or null

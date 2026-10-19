@@ -2,6 +2,7 @@ package com.codex.pestcontrol.ui;
 
 import com.codex.pestcontrol.core.Advice;
 import com.codex.pestcontrol.core.Battle;
+import com.codex.pestcontrol.core.Experience;
 import com.codex.pestcontrol.core.GameRecord;
 import com.codex.pestcontrol.core.Goal;
 import com.codex.pestcontrol.core.Landers;
@@ -9,6 +10,7 @@ import com.codex.pestcontrol.core.Outlook;
 import com.codex.pestcontrol.core.Portal;
 import com.codex.pestcontrol.core.Reward;
 import com.codex.pestcontrol.core.SharedBank;
+import com.codex.pestcontrol.core.Sitting;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
@@ -390,6 +392,7 @@ public class PilotPanel extends PluginPanel
 		}
 
 		addMilestones(stack, o);
+		addSpare(stack, o);
 
 		stack.add(new SectionHeader("Rewards", "click to choose"));
 		int spend = Math.max(0, o.getPoints());
@@ -446,6 +449,35 @@ public class PilotPanel extends PluginPanel
 		}
 		stack.add(Ui.wrapped(foot.toString(), Theme.small(), Theme.TEXT_FAINT, WIDTH - 16));
 		replace(goal, stack);
+	}
+
+	/**
+	 * Points the goal leaves spare, turned into the combat experience they buy at the reward shop,
+	 * the most first, in bundles of 100 for the bonus.
+	 */
+	private void addSpare(StackPanel stack, Outlook o)
+	{
+		int spare = Experience.spare(o);
+		if (spare < 10 || view.levels == null)
+		{
+			return;
+		}
+		stack.add(new SectionHeader("Spare points", Format.number(spare) + " into xp"));
+		Card card = new Card(new BorderLayout(0, 6));
+		card.accent(Theme.TEAL);
+		StackPanel rows = new StackPanel(3, 0);
+		for (Experience.Line line : Experience.of(view.levels, spare))
+		{
+			String left = line.getSkill().getTitle() + "  " + line.getLevel();
+			rows.add(line.isLocked() ? line(left, "needs " + Experience.MIN_LEVEL, Theme.TEXT_FAINT)
+				: line(left, "+" + Format.number(line.getXp()) + " xp", Theme.TEAL));
+		}
+		card.add(rows, BorderLayout.CENTER);
+		stack.add(card);
+		String text = o.isComplete() || o.getCost() == 0
+			? "Your goal is done, so every point is spare."
+			: "Points beyond what your goal still costs.";
+		stack.add(Ui.wrapped(text + " Spend them 100 at a time for 10% more experience.", Theme.small(), Theme.TEXT_FAINT, WIDTH - 16));
 	}
 
 	/** The pieces still needed in the order to buy them, each with the games until it can be. */
@@ -548,6 +580,7 @@ public class PilotPanel extends PluginPanel
 			replace(record, stack);
 			return;
 		}
+		addSitting(stack, view.sitting);
 		addDamage(stack, games);
 		addLanders(stack);
 
@@ -557,6 +590,34 @@ public class PilotPanel extends PluginPanel
 			stack.add(new GameRow(games.get(i), view.now));
 		}
 		replace(record, stack);
+	}
+
+	/** A small label on the left and a coloured figure on the right. */
+	private static JComponent line(String left, String right, Color color)
+	{
+		JPanel row = new JPanel(new BorderLayout(6, 0));
+		row.setOpaque(false);
+		row.add(Ui.label(left, Theme.small(), Theme.TEXT_MUTED), BorderLayout.CENTER);
+		row.add(Ui.label(right, Theme.small(), color), BorderLayout.EAST);
+		return row;
+	}
+
+	/** The sitting in hand or the last one, with its points an hour counting the lander time. */
+	private void addSitting(StackPanel stack, Sitting s)
+	{
+		if (s == null || s.isEmpty())
+		{
+			return;
+		}
+		stack.add(new SectionHeader(s.isCurrent() ? "This sitting" : "Last sitting",
+			s.isCurrent() ? Format.span(s.spanMs() / 60_000.0) : Format.ago(s.getGames().get(s.getGames().size() - 1).getEnded(), view.now)));
+		JPanel tiles = new JPanel(new GridLayout(1, 3, 6, 0));
+		tiles.setOpaque(false);
+		int count = s.getGames().size();
+		tiles.add(new StatTile(Format.number(count), count == 1 ? "Game" : "Games", s.getWon() + " won", Theme.GOLD));
+		tiles.add(new StatTile(Format.number(s.getPoints()), "Points", s.getUnpaid() > 0 ? s.getUnpaid() + " unpaid" : "earned", Theme.GOLD_BRIGHT));
+		tiles.add(new StatTile(s.pointsPerHour() > 0 ? String.valueOf(s.pointsPerHour()) : "-", "Per hour", "waits in", Theme.TEAL));
+		stack.add(tiles);
 	}
 
 	/** Games charted for damage. */

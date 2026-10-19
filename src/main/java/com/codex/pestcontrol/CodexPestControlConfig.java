@@ -93,4 +93,15 @@ public interface CodexPestControlConfig extends Config
 	{
 		return true;
 	}
+
+	@ConfigItem(
+		keyName = "gameSummary",
+		name = "Game summary in chat",
+		description = "After a game, write its points and damage, how far the goal is and the sitting's points an hour in the chat box",
+		position = 6
+	)
+	default boolean gameSummary()
+	{
+		return true;
+	}
 }
