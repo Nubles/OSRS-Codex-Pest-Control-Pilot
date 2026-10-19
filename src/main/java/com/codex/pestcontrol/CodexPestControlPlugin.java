@@ -6,6 +6,7 @@ import com.codex.pestcontrol.core.Boat;
 import com.codex.pestcontrol.core.Experience;
 import com.codex.pestcontrol.core.Field;
 import com.codex.pestcontrol.core.GameRecord;
+import com.codex.pestcontrol.core.GameWatch;
 import com.codex.pestcontrol.core.GameSummary;
 import com.codex.pestcontrol.core.Goal;
 import com.codex.pestcontrol.core.Landers;
@@ -17,6 +18,7 @@ import com.codex.pestcontrol.core.Reward;
 import com.codex.pestcontrol.core.SharedBank;
 import com.codex.pestcontrol.core.Sitting;
 import com.codex.pestcontrol.core.Style;
+import com.codex.pestcontrol.core.VoidCheck;
 import com.codex.pestcontrol.overlay.MinimapMarker;
 import com.codex.pestcontrol.overlay.PilotPlaque;
 import com.codex.pestcontrol.overlay.PortalMarker;
@@ -42,6 +44,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.inject.Inject;
@@ -76,6 +79,7 @@ import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ClientShutdown;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.events.RuneScapeProfileChanged;
 import net.runelite.client.game.ItemManager;
@@ -100,8 +104,6 @@ public class CodexPestControlPlugin extends Plugin
 	/** Codex Gear Roadmap keeps the bank it last saw here (item ids); read only, and only when that plugin has saved one. */
 	/** The Void Knights' Outpost island. */
 	private static final int OUTPOST_REGION = 10537;
-	/** Ticks after a game's status bar goes for its closing messages to arrive. */
-	private static final int SETTLE_TICKS = 4;
 	/** A spinner this close to a portal is healing it. */
 	private static final int SPINNER_RANGE = 8;
 	/** A brawler this close to a portal is in the way. */
@@ -193,6 +195,8 @@ public class CodexPestControlPlugin extends Plugin
 	private String profile;
 	private Logbook logbook;
 	private Set<Reward> carriedOwned = EnumSet.noneOf(Reward.class);
+	/** The rewards worn now, for the void check. */
+	private Set<Reward> worn = EnumSet.noneOf(Reward.class);
 	/** Rewards in the bank as Codex Gear Roadmap last saved it, or null when it has saved none. Used until this plugin sees the bank. */
 	private SharedBank shared;
 	/** Codex Navigator's goal board as saved for this profile, or null; and what its goals need, read from it. */
@@ -204,7 +208,7 @@ public class CodexPestControlPlugin extends Plugin
 	private Battle battle;
 	/** A game whose status bar has gone, waiting a few ticks for its closing messages. */
 	private Battle ending;
-	private int endingTicks;
+	private final GameWatch watch = new GameWatch();
 	private Result result = new Result();
 	private Boat landerBoat;
 	private boolean inLander;
@@ -249,9 +253,11 @@ public class CodexPestControlPlugin extends Plugin
 		clientThread.invokeLater(() ->
 		{
 			loadProfile();
+			watch.reset();
 			if (client.getGameState() == GameState.LOGGED_IN)
 			{
 				carriedOwned = carried();
+				worn = owned(client.getItemContainer(InventoryID.WORN));
 				for (NPC npc : client.getTopLevelWorldView().npcs())
 				{
 					track(npc);
@@ -283,15 +289,50 @@ public class CodexPestControlPlugin extends Plugin
 	}
 
 	@Subscribe
+	public void onClientShutdown(ClientShutdown event)
+	{
+		// ConfigManager writes its changes to disk in this same event, before a save queued on the
+		// client thread runs, so a save made here has to be sent on by hand or it is never written.
+		CompletableFuture<Void> done = new CompletableFuture<>();
+		clientThread.invokeLater(() ->
+		{
+			try
+			{
+				if (unsaved && profile != null && logbook != null)
+				{
+					save();
+					configManager.sendConfig();
+				}
+			}
+			finally
+			{
+				done.complete(null);
+			}
+		});
+		event.waitFor(done);
+	}
+
+	@Subscribe
 	public void onGameStateChanged(GameStateChanged event)
 	{
 		GameState state = event.getGameState();
 		if (state == GameState.LOGIN_SCREEN || state == GameState.HOPPING || state == GameState.CONNECTION_LOST)
 		{
-			if (battle != null)
+			// A dropped connection the client gets back puts you in the same game: it is held, not
+			// ended, and carries on with your damage. Logging out or hopping leaves it.
+			if (state != GameState.CONNECTION_LOST)
 			{
-				finish(battle, true);
+				if (battle != null && logbook != null)
+				{
+					finish(battle, true);
+				}
+				else if (ending != null && logbook != null)
+				{
+					finish(ending, false);
+				}
 				battle = null;
+				ending = null;
+				watch.reset();
 			}
 			portals.clear();
 			spinners.clear();
@@ -313,6 +354,12 @@ public class CodexPestControlPlugin extends Plugin
 	public void onRuneScapeProfileChanged(RuneScapeProfileChanged event)
 	{
 		save();
+		if (configManager.getRSProfileKey() == null)
+		{
+			// Logging out can leave no profile until the next login. The account's logbook stays in
+			// hand, saved, so the panel still shows it and the game under way is still recorded.
+			return;
+		}
 		loadProfile();
 		carriedOwned = client.getGameState() == GameState.LOGGED_IN ? carried() : EnumSet.noneOf(Reward.class);
 		publish();
@@ -487,6 +534,7 @@ public class CodexPestControlPlugin extends Plugin
 		else if (id == InventoryID.INV || id == InventoryID.WORN)
 		{
 			carriedOwned = carried();
+			worn = owned(client.getItemContainer(InventoryID.WORN));
 			dirty = true;
 		}
 	}
@@ -498,30 +546,50 @@ public class CodexPestControlPlugin extends Plugin
 		{
 			return;
 		}
-		boolean inGame = visible(InterfaceID.PestStatusOverlay.PEST_STATUS_PORT1);
-		if (inGame && battle == null)
+		switch (watch.tick(visible(InterfaceID.PestStatusOverlay.PEST_STATUS_PORT1)))
 		{
-			result = new Result();
-			ending = null;
+			case START:
+				result = new Result();
+				ending = null;
+				for (NPC npc : client.getTopLevelWorldView().npcs())
+				{
+					track(npc);
+				}
+				battle = new Battle();
+				// Portals that spawned before the game was seen may already be open; when is not known.
+				for (Map.Entry<Portal, NPC> e : portals.entrySet())
+				{
+					if (OPEN.containsKey(e.getValue().getId()))
+					{
+						battle.foundOpen(e.getKey());
+					}
+				}
+				break;
+			case RESUME:
+				battle = ending != null ? ending : new Battle();
+				ending = null;
+				break;
+			case SETTLE:
+				ending = battle;
+				battle = null;
+				break;
+			case FINISH:
+				if (ending != null)
+				{
+					finish(ending, false);
+				}
+				ending = null;
+				break;
+			default:
+				break;
+		}
+		if (battle != null && portals.isEmpty())
+		{
+			// Back from a dropped connection, the scene was loaded afresh: find the portals again.
 			for (NPC npc : client.getTopLevelWorldView().npcs())
 			{
 				track(npc);
 			}
-			battle = new Battle();
-			// Portals that spawned before the game was seen may already be open; when is not known.
-			for (Map.Entry<Portal, NPC> e : portals.entrySet())
-			{
-				if (OPEN.containsKey(e.getValue().getId()))
-				{
-					battle.foundOpen(e.getKey());
-				}
-			}
-		}
-		else if (!inGame && battle != null)
-		{
-			ending = battle;
-			endingTicks = 0;
-			battle = null;
 		}
 
 		if (battle != null)
@@ -543,11 +611,6 @@ public class CodexPestControlPlugin extends Plugin
 			dirty = true;
 		}
 
-		if (ending != null && ++endingTicks >= SETTLE_TICKS)
-		{
-			finish(ending, false);
-			ending = null;
-		}
 
 		boolean lander = visible(InterfaceID.PestLanderOverlay.PEST_LANDER_OVER_POINTS);
 		if (lander)
@@ -985,7 +1048,7 @@ public class CodexPestControlPlugin extends Plugin
 		boolean outpost = me != null && me.getWorldLocation().getRegionID() == OUTPOST_REGION;
 		View.State state = battle != null ? View.State.BATTLE : inLander ? View.State.LANDER : outpost ? View.State.OUTPOST : View.State.AWAY;
 		View view = view(state, fight, now);
-		showPlaque(state, advice, battle, outlook(), Goal.matching(logbook.getGoal()));
+		showPlaque(state, advice, battle, outlook(), Goal.matching(logbook.getGoal()), view.voidCheck);
 		showMarker(advice);
 		if (target != null)
 		{
@@ -1098,10 +1161,11 @@ public class CodexPestControlPlugin extends Plugin
 		view.levels = me == null ? null : levels();
 		view.xp = me == null ? null : experience();
 		view.goals = navigatorNeeds(view.levels);
+		view.voidCheck = battle == null && me != null ? VoidCheck.of(worn, style(), owned()) : null;
 		return view;
 	}
 
-	private void showPlaque(View.State state, Advice advice, Battle b, Outlook o, Goal preset)
+	private void showPlaque(View.State state, Advice advice, Battle b, Outlook o, Goal preset, VoidCheck voidCheck)
 	{
 		CodexPestControlConfig.PlaqueMode mode = config.plaque();
 		if (mode == CodexPestControlConfig.PlaqueMode.NEVER || state == View.State.AWAY
@@ -1129,6 +1193,12 @@ public class CodexPestControlPlugin extends Plugin
 				footColor = Theme.EMBER;
 			}
 			plaque.show(new PilotPlaque.Shown(kicker, advice.getHeadline(), colour, advice.getDetail(), foot, footColor));
+			return;
+		}
+		if (voidCheck != null && voidCheck.isWarning() && config.voidCheck())
+		{
+			// Still time to fix it before the game: that matters more than the points tally.
+			plaque.show(new PilotPlaque.Shown("VOID CHECK", voidCheck.getHeadline(), Theme.EMBER, voidCheck.getDetail(), null, null));
 			return;
 		}
 		String goal = preset != null ? preset.getTitle() : "Your goal";

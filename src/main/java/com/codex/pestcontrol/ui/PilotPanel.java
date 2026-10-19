@@ -213,6 +213,17 @@ public class PilotPanel extends PluginPanel
 
 	// The Battle tab.
 
+	/** What the void worn now does for the weapon in hand: green when the set bonus is on, ember when it is lost. */
+	private static Card voidCard(com.codex.pestcontrol.core.VoidCheck check)
+	{
+		Color colour = check.isWarning() ? Theme.EMBER : check.getKind() == com.codex.pestcontrol.core.VoidCheck.Kind.SET_ON ? Theme.GREEN : Theme.GOLD;
+		Card card = new Card(new BorderLayout(0, 3));
+		card.accent(colour);
+		card.add(Ui.label(check.getHeadline(), Theme.body(), colour), BorderLayout.NORTH);
+		card.add(Ui.wrapped(check.getDetail() + ".", Theme.small(), Theme.TEXT_MUTED, WIDTH - 30), BorderLayout.CENTER);
+		return card;
+	}
+
 	private void rebuildBattle()
 	{
 		StackPanel stack = new StackPanel(8, 8);
@@ -229,9 +240,17 @@ public class PilotPanel extends PluginPanel
 			{
 				stack.add(note("Waiting in the lander", "When the game starts the Pilot charts the island and tells you which portal to work, marking it in the world and on the minimap."));
 			}
+			else if (view.state == View.State.OUTPOST)
+			{
+				stack.add(note("At the outpost", "Board a lander and the Pilot takes over once the game starts."));
+			}
 			else
 			{
 				stack.add(note("Not in a game", "Take the boat from Port Sarim to the Void Knights' Outpost and board a lander. The Pilot takes over once the game starts."));
+			}
+			if (view.voidCheck != null)
+			{
+				stack.add(voidCard(view.voidCheck));
 			}
 			stack.add(map);
 			if (view.last != null)

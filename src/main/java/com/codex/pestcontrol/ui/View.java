@@ -128,6 +128,8 @@ public final class View
 	public int combat;
 	/** The sitting in hand, or the last one; null or empty with no games. */
 	public com.codex.pestcontrol.core.Sitting sitting;
+	/** What the void worn now does for the weapon in hand, outside a game; null when there is nothing to say. */
+	public com.codex.pestcontrol.core.VoidCheck voidCheck;
 	/** Real levels in {@link com.codex.pestcontrol.core.Experience.Skill} order, or null when logged out. */
 	public int[] levels;
 	/** Experience in the same order, or null when logged out. */

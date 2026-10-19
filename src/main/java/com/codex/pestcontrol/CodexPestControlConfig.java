@@ -104,4 +104,15 @@ public interface CodexPestControlConfig extends Config
 	{
 		return true;
 	}
+
+	@ConfigItem(
+		keyName = "voidCheck",
+		name = "Void check on the plaque",
+		description = "Before a game, when the void you wear gives no set bonus (a piece missing, or a helm for another style than your weapon), say so on the plaque",
+		position = 7
+	)
+	default boolean voidCheck()
+	{
+		return true;
+	}
 }
