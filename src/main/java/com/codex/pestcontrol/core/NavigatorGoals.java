@@ -1,7 +1,6 @@
 package com.codex.pestcontrol.core;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -94,8 +93,9 @@ public final class NavigatorGoals
 		{
 			board = gson.fromJson(json, Board.class);
 		}
-		catch (JsonParseException | IllegalStateException e)
+		catch (RuntimeException | StackOverflowError e)
 		{
+			// Cut short, not JSON, or garbage nested deeper than Gson reads.
 			return Collections.emptyList();
 		}
 		if (board == null || board.goals == null)

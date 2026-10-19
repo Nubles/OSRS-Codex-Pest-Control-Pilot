@@ -31,7 +31,6 @@ import com.codex.pestcontrol.ui.Sigil;
 import com.codex.pestcontrol.ui.Theme;
 import com.codex.pestcontrol.ui.View;
 import com.google.gson.Gson;
-import com.google.gson.JsonParseException;
 import com.google.inject.Provides;
 import java.awt.Color;
 import java.util.ArrayList;
@@ -939,23 +938,8 @@ public class CodexPestControlPlugin extends Plugin
 		{
 			return;
 		}
-		try
-		{
-			String saved = configManager.getRSProfileConfiguration(CodexPestControlConfig.GROUP, LOGBOOK_KEY);
-			if (saved != null && !saved.isEmpty())
-			{
-				Logbook read = gson.fromJson(saved, Logbook.class);
-				logbook = read == null ? null : read.repair();
-			}
-		}
-		catch (JsonParseException e)
-		{
-			log.warn("Could not read the saved logbook, starting afresh", e);
-		}
-		if (logbook == null)
-		{
-			logbook = new Logbook();
-		}
+		// A damaged save keeps all it can: a field or game that cannot be read is lost alone.
+		logbook = Logbook.read(gson, configManager.getRSProfileConfiguration(CodexPestControlConfig.GROUP, LOGBOOK_KEY));
 		readShared();
 		readNavigator();
 		unsaved = false;
