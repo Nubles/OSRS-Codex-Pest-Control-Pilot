@@ -45,9 +45,9 @@ public class PointsToTest
 		Outlook covered = Outlook.of(java.util.EnumSet.of(Reward.TOP), java.util.EnumSet.noneOf(Reward.class), 290, 5, 10, true);
 		assertEquals(0, Experience.gamesFor(covered, 40));
 		assertEquals(2, Experience.gamesFor(covered, 50));
-		// Points not seen yet: every point is still to earn.
+		// Points not seen yet: they are not zero, so no games are counted until they are read.
 		Outlook unseen = Outlook.of(java.util.EnumSet.noneOf(Reward.class), java.util.EnumSet.noneOf(Reward.class), -1, 5, 10, true);
-		assertEquals(4, Experience.gamesFor(unseen, 20));
+		assertEquals(-1, Experience.gamesFor(unseen, 20));
 	}
 }
 

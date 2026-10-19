@@ -640,8 +640,9 @@ public class PilotPanel extends PluginPanel
 			else
 			{
 				int games = Experience.gamesFor(o, points);
-				long by = habit.afterGames(games, view.now);
-				how = Format.number(points) + " points, " + Format.plural(games, "game", "games") + (by > 0 ? ", " + Format.shortDay(by) : "");
+				long by = games > 0 ? habit.afterGames(games, view.now) : -1;
+				how = games < 0 ? Format.number(points) + " points; games once a lander reads yours"
+					: Format.number(points) + " points, " + Format.plural(games, "game", "games") + (by > 0 ? ", " + Format.shortDay(by) : "");
 			}
 			JPanel row = new JPanel(new BorderLayout(0, 1));
 			row.setOpaque(false);

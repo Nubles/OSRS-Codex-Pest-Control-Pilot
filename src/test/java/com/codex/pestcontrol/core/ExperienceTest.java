@@ -51,4 +51,14 @@ public class ExperienceTest
 		assertTrue(lines.get(lines.size() - 1).isLocked());
 		assertTrue(lines.get(lines.size() - 2).isLocked());
 	}
+
+	@Test
+	public void gamesForANavigatorGoalWaitForThePoints()
+	{
+		// Unread points are not zero points: no games are counted until a lander reads them.
+		Outlook unread = Outlook.of(java.util.EnumSet.of(Reward.TOP), java.util.EnumSet.noneOf(Reward.class), -1, 5, 4, true);
+		assertEquals(-1, Experience.gamesFor(unread, 300));
+		Outlook read = Outlook.of(java.util.EnumSet.of(Reward.TOP), java.util.EnumSet.noneOf(Reward.class), 0, 5, 4, true);
+		assertEquals(110, Experience.gamesFor(read, 300));
+	}
 }

@@ -186,10 +186,14 @@ public final class Experience
 	 * Games it takes to earn the points for some experience, after the goal: points the goal leaves
 	 * spare count first, and the points the goal still needs are earned before any go to experience.
 	 *
-	 * @return the games, 0 when the spare points already cover it
+	 * @return the games, 0 when the spare points already cover it, -1 before the points are read
 	 */
 	public static int gamesFor(Outlook outlook, int points)
 	{
+		if (!outlook.isPointsKnown())
+		{
+			return -1;
+		}
 		long earn = (long) points - spare(outlook) + outlook.getRemaining();
 		return earn <= 0 ? 0 : (int) Math.ceil(earn / Math.max(0.5, outlook.getPerGame()));
 	}
