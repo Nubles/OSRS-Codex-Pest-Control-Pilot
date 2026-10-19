@@ -25,6 +25,7 @@ import com.codex.pestcontrol.overlay.PortalMarker;
 import com.codex.pestcontrol.ui.Actions;
 import com.codex.pestcontrol.ui.Format;
 import com.codex.pestcontrol.ui.ItemIcons;
+import com.codex.pestcontrol.ui.LoadingIcons;
 import com.codex.pestcontrol.ui.PilotPanel;
 import com.codex.pestcontrol.ui.Sigil;
 import com.codex.pestcontrol.ui.Theme;
@@ -88,7 +89,6 @@ import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.OverlayManager;
-import net.runelite.client.util.AsyncBufferedImage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -238,12 +238,7 @@ public class CodexPestControlPlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
-		ItemIcons icons = (itemId, onLoaded) ->
-		{
-			AsyncBufferedImage image = itemManager.getImage(itemId);
-			image.onLoaded(onLoaded);
-			return image;
-		};
+		ItemIcons icons = new LoadingIcons(itemManager::getImage);
 		panel = new PilotPanel(icons, new PanelActions());
 		navButton = NavigationButton.builder()
 			.tooltip("Codex Pest Control Pilot")
