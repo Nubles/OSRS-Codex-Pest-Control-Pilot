@@ -115,4 +115,15 @@ public interface CodexPestControlConfig extends Config
 	{
 		return true;
 	}
+
+	@ConfigItem(
+		keyName = "nameOnCard",
+		name = "Name on cards",
+		description = "Write your character's name on the void card; turn off to share it without it",
+		position = 8
+	)
+	default boolean nameOnCard()
+	{
+		return true;
+	}
 }

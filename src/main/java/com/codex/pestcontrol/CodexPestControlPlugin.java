@@ -1170,6 +1170,7 @@ public class CodexPestControlPlugin extends Plugin
 		view.xp = me == null ? null : experience();
 		view.goals = navigatorNeeds(view.levels);
 		view.voidCheck = battle == null && me != null ? VoidCheck.of(worn, style(), owned()) : null;
+		view.nameOnCard = config.nameOnCard();
 		return view;
 	}
 

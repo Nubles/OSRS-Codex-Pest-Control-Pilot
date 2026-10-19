@@ -66,6 +66,8 @@ class Wardrobe extends JComponent
 	private final Slot[] slots;
 	private final Set<Reward> goal;
 	private final Set<Reward> owned;
+	/** The pieces the points buy now, together, in the buy order. */
+	private final Set<Reward> buyable;
 	private final int points;
 	private final boolean pointsKnown;
 	private final boolean elite;
@@ -75,16 +77,18 @@ class Wardrobe extends JComponent
 	private final String title;
 
 	/**
+	 * @param buyable the pieces the points buy now, together ({@link com.codex.pestcontrol.core.Outlook#buyableNow})
 	 * @param points commendation points held, for how far each wanted piece is saved toward
 	 * @param elite the hard Western Provinces diary is done, so elite pieces can be bought
 	 * @param toggle adds a reward to the goal or takes it out; null for none
 	 */
-	Wardrobe(String title, Set<Reward> goal, Set<Reward> owned, int points, boolean pointsKnown, boolean elite, ItemIcons icons,
-		Consumer<Reward> toggle)
+	Wardrobe(String title, Set<Reward> goal, Set<Reward> owned, Set<Reward> buyable, int points, boolean pointsKnown, boolean elite,
+		ItemIcons icons, Consumer<Reward> toggle)
 	{
 		this.title = title;
 		this.goal = goal;
 		this.owned = owned;
+		this.buyable = buyable;
 		this.points = points;
 		this.pointsKnown = pointsKnown;
 		this.elite = elite;
@@ -139,8 +143,12 @@ class Wardrobe extends JComponent
 		};
 	}
 
-	/** How a reward's slot looks: owned whole, wanted dim with its savings, the rest faint. */
-	static Look look(Reward r, Set<Reward> goal, Set<Reward> owned, int points, boolean pointsKnown, boolean elite)
+	/**
+	 * How a reward's slot looks: owned whole, wanted dim with its savings, the rest faint. Teal
+	 * marks only the pieces the points buy together, so three pieces that 412 points would each
+	 * cover alone are not all lit when they cover one.
+	 */
+	static Look look(Reward r, Set<Reward> goal, Set<Reward> owned, Set<Reward> buyable, boolean elite)
 	{
 		if (owned.contains(r))
 		{
@@ -154,7 +162,7 @@ class Wardrobe extends JComponent
 		{
 			return Look.LOCKED;
 		}
-		return pointsKnown && points >= r.getCost() ? Look.CAN_BUY : Look.WANTED;
+		return buyable.contains(r) ? Look.CAN_BUY : Look.WANTED;
 	}
 
 	private int gridX()
@@ -195,15 +203,15 @@ class Wardrobe extends JComponent
 			return null;
 		}
 		Reward r = s.reward;
-		switch (look(r, goal, owned, points, pointsKnown, elite))
+		switch (look(r, goal, owned, buyable, elite))
 		{
 			case OWNED:
 				return r.getTitle() + ": yours";
 			case CAN_BUY:
 				return r.getTitle() + ": you can buy it now (" + r.getCost() + " points). Click to take it out of your goal";
 			case WANTED:
-				return r.getTitle() + ": " + (pointsKnown ? Math.max(0, r.getCost() - Math.max(0, points)) + " points to go" : r.getCost() + " points")
-					+ ". Click to take it out of your goal";
+				return r.getTitle() + ": " + (pointsKnown ? Math.max(0, r.getCost() - spare()) + " points to go once the pieces before it are bought"
+					: r.getCost() + " points") + ". Click to take it out of your goal";
 			case LOCKED:
 				return r.getTitle() + ": needs the hard Western Provinces diary";
 			default:
@@ -258,19 +266,30 @@ class Wardrobe extends JComponent
 		}
 
 		// Under it: where the goal stands, in one line.
-		String foot = foot(title, goal, owned, points, pointsKnown, elite);
+		String foot = foot(title, goal, owned, buyable, Math.max(0, points), pointsKnown, elite);
 		Color footColor = wanted == 0 ? Theme.TEXT_MUTED : have == wanted ? Theme.GREEN
-			: foot.startsWith("Enough") ? Theme.TEAL : foot.startsWith("Points") ? Theme.GOLD : Theme.TEXT_MUTED;
+			: !buyable.isEmpty() ? Theme.TEAL : foot.startsWith("Points") ? Theme.GOLD : Theme.TEXT_MUTED;
 		int fy = HEIGHT - 14;
 		Ui.shadowed(g, Ui.clip(foot, small, w - PAD * 2), (w - Math.min(w - PAD * 2, small.stringWidth(foot))) / 2, fy, footColor);
 		g.dispose();
 	}
 
+	/** The points left once the pieces that can be bought now are. */
+	private int spare()
+	{
+		int left = Math.max(0, points);
+		for (Reward r : buyable)
+		{
+			left -= r.getCost();
+		}
+		return Math.max(0, left);
+	}
+
 	/**
-	 * The line under the slots: what the rest of the goal still costs, or that the points are there,
-	 * minding that the elite pieces cannot be bought until the diary is done.
+	 * The line under the slots: what the points buy now, or how to change the goal. The crest
+	 * already says how many points the goal still wants, so the line does not say it again.
 	 */
-	static String foot(String title, Set<Reward> goal, Set<Reward> owned, int points, boolean pointsKnown, boolean elite)
+	static String foot(String title, Set<Reward> goal, Set<Reward> owned, Set<Reward> buyable, int points, boolean pointsKnown, boolean elite)
 	{
 		int left = 0;
 		boolean locked = false;
@@ -296,18 +315,30 @@ class Wardrobe extends JComponent
 		{
 			return Format.number(left) + " points for the rest";
 		}
-		int toGo = Math.max(0, left - Math.max(0, points));
-		if (toGo > 0)
+		int wanted = 0;
+		for (Reward r : goal)
 		{
-			return Format.number(toGo) + " points to the rest";
+			wanted += owned.contains(r) || r.isElite() && !elite ? 0 : 1;
 		}
-		return locked ? "Points enough; the diary is due" : "Enough points for the rest now";
+		if (points >= left && buyable.size() == wanted)
+		{
+			return locked ? "Points enough; the diary is due" : "Enough points for the rest now";
+		}
+		if (buyable.size() == 1)
+		{
+			return "Teal: buy the " + buyable.iterator().next().getShortTitle().toLowerCase(Locale.ENGLISH) + " now";
+		}
+		if (!buyable.isEmpty())
+		{
+			return "Teal: these " + buyable.size() + " can be bought now";
+		}
+		return wanted == 0 ? "The rest needs the hard diary" : "Not enough points for a piece yet";
 	}
 
 	private void paintSlot(Graphics2D g, Slot s, int x, int y, FontMetrics small)
 	{
 		Reward r = s.reward;
-		Look look = r == null ? null : look(r, goal, owned, points, pointsKnown, elite);
+		Look look = r == null ? null : look(r, goal, owned, buyable, elite);
 		RoundRectangle2D well = new RoundRectangle2D.Float(x + 0.5f, y + 0.5f, SLOT_W - 1, SLOT_H - 1, 7, 7);
 		g.setPaint(new GradientPaint(0, y, Theme.INK_DEEP, 0, y + SLOT_H, Theme.mix(Theme.INK_DEEP, Theme.CARD, 0.6)));
 		g.fill(well);
@@ -347,7 +378,8 @@ class Wardrobe extends JComponent
 		else if (look == Look.WANTED || look == Look.CAN_BUY)
 		{
 			// The points saved toward it, as a bar along the slot's foot.
-			double share = pointsKnown ? Math.max(0, Math.min(1, points / (double) r.getCost())) : 0;
+			// A piece waiting its turn counts only what is left once those that can be bought now are.
+			double share = look == Look.CAN_BUY ? 1 : pointsKnown ? Math.max(0, Math.min(1, spare() / (double) r.getCost())) : 0;
 			int bw = SLOT_W - 8;
 			g.setColor(Theme.alpha(Theme.INK_DEEP, 220));
 			g.fillRect(x + 4, y + SLOT_H - 5, bw, 2);

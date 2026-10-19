@@ -15,9 +15,11 @@ import com.codex.pestcontrol.core.SharedBank;
 import com.codex.pestcontrol.core.Sitting;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
+import java.awt.FlowLayout;
 import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.GridLayout;
+import java.awt.Toolkit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -28,6 +30,7 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.ScrollPaneConstants;
 import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
 import net.runelite.client.ui.PluginPanel;
 
@@ -412,7 +415,9 @@ public class PilotPanel extends PluginPanel
 		Outlook o = view.outlook;
 		stack.add(presets);
 		// The goal as it would be worn, a slot a reward; a click there chooses as the list below does.
-		stack.add(new Wardrobe(view.preset != null ? view.preset.getTitle() : "your goal", view.goal, view.owned,
+		// Teal is for what the points buy together, in the buy order, not each piece they cover alone.
+		java.util.Set<Reward> buyable = o.buyableNow(locked(o));
+		stack.add(new Wardrobe(view.preset != null ? view.preset.getTitle() : "your goal", view.goal, view.owned, buyable,
 			Math.max(0, o.getPoints()), o.isPointsKnown(), view.elite, icons, actions == null ? null : actions::toggle));
 
 		Card progress = new Card(new BorderLayout(0, 8));
@@ -449,6 +454,10 @@ public class PilotPanel extends PluginPanel
 			progress.add(south, BorderLayout.SOUTH);
 		}
 		stack.add(progress);
+		if (!view.goal.isEmpty())
+		{
+			stack.add(cardButton(buyable, by));
+		}
 		String faster = fasterLander();
 		if (faster != null)
 		{
@@ -481,7 +490,6 @@ public class PilotPanel extends PluginPanel
 		addGoals(stack, o, habit);
 
 		stack.add(new SectionHeader("Rewards", "click to choose"));
-		int spend = Math.max(0, o.getPoints());
 		for (Reward r : Reward.values())
 		{
 			RewardRow.Standing standing;
@@ -496,7 +504,7 @@ public class PilotPanel extends PluginPanel
 				standing = RewardRow.Standing.LOCKED;
 				rowNote = "diary";
 			}
-			else if (chosen && o.isPointsKnown() && spend >= r.getCost())
+			else if (chosen && buyable.contains(r))
 			{
 				standing = RewardRow.Standing.CAN_BUY;
 			}
@@ -637,13 +645,63 @@ public class PilotPanel extends PluginPanel
 		stack.add(Ui.wrapped("Points the goal above leaves spare count first; the rest are earned at your rate once the goal is bought.", Theme.small(), Theme.TEXT_FAINT, WIDTH - 16));
 	}
 
-	/** The pieces still needed in the order to buy them, each with the games until it can be. */
-	private void addMilestones(StackPanel stack, Outlook o)
+	/** How long a void card waits for item pictures still on their way before it is drawn anyway. */
+	private static final int PICTURE_WAIT_MS = 3_000;
+
+	/** Copies a picture of the void goal, to paste into a chat, once its pictures are in. */
+	private JComponent cardButton(java.util.Set<Reward> buyable, long by)
 	{
-		if (o.getNeeded().size() < 2)
+		JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+		buttons.setOpaque(false);
+		CodexButton copy = new CodexButton("Copy void card", false, null);
+		copy.setToolTipText("Copies a picture of your void goal and the games left, to paste into a chat");
+		View shown = view;
+		copy.setAction(() ->
 		{
-			return;
-		}
+			boolean[] drawn = {false};
+			Runnable draw = () ->
+			{
+				if (drawn[0])
+				{
+					return;
+				}
+				drawn[0] = true;
+				try
+				{
+					Toolkit.getDefaultToolkit().getSystemClipboard().setContents(VoidSheet.transferable(VoidSheet.render(
+						shown.preset != null ? shown.preset.getTitle() : null, shown.nameOnCard ? shown.player : null, shown.outlook,
+						shown.goal, shown.owned, buyable, shown.elite, by, shown.now, icons)), null);
+					copy.flash("Copied: paste it anywhere");
+				}
+				catch (IllegalStateException e)
+				{
+					// Another program holds the clipboard.
+					copy.flash("Clipboard busy, try again");
+				}
+			};
+			if (icons == null)
+			{
+				draw.run();
+				return;
+			}
+			// The card waits for every slot's picture, so it never goes out with empty slots; a
+			// picture that never comes holds it up only so long.
+			Timer late = new Timer(PICTURE_WAIT_MS, e -> draw.run());
+			late.setRepeats(false);
+			late.start();
+			icons.whenLoaded(VoidSheet.pictures(shown.goal, shown.owned), () ->
+			{
+				late.stop();
+				draw.run();
+			});
+		});
+		buttons.add(copy);
+		return buttons;
+	}
+
+	/** The elite pieces the goal still needs that the diary keeps locked. */
+	private java.util.Set<Reward> locked(Outlook o)
+	{
 		java.util.Set<Reward> locked = java.util.EnumSet.noneOf(Reward.class);
 		if (!view.elite)
 		{
@@ -655,6 +713,17 @@ public class PilotPanel extends PluginPanel
 				}
 			}
 		}
+		return locked;
+	}
+
+	/** The pieces still needed in the order to buy them, each with the games until it can be. */
+	private void addMilestones(StackPanel stack, Outlook o)
+	{
+		if (o.getNeeded().size() < 2)
+		{
+			return;
+		}
+		java.util.Set<Reward> locked = locked(o);
 		List<Outlook.Milestone> steps = o.milestones(locked);
 		stack.add(new SectionHeader("Buy order", "as points come"));
 		Card card = new Card(new BorderLayout());

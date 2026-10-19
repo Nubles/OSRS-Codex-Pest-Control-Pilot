@@ -2,6 +2,7 @@ package com.codex.pestcontrol.core;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
@@ -235,6 +236,33 @@ public final class Outlook
 			int shortfall = Math.max(0, total - held);
 			int g = shortfall == 0 ? 0 : (int) Math.ceil(shortfall / perGame);
 			out.add(new Milestone(r, total, g, g * minutesPerGame));
+		}
+		return out;
+	}
+
+	/**
+	 * The pieces the points held buy now, together: those the buy order reaches before the points
+	 * run out. With 412 points toward a top, a robe and a helm, that is the top alone, not each of
+	 * the three that 412 would cover on its own. Pieces in {@code locked} (elite ones behind the
+	 * diary) are never among them; unknown points buy nothing.
+	 */
+	public Set<Reward> buyableNow(Set<Reward> locked)
+	{
+		Set<Reward> out = EnumSet.noneOf(Reward.class);
+		if (!isPointsKnown())
+		{
+			return out;
+		}
+		for (Milestone m : milestones(locked))
+		{
+			if (m.getGames() > 0)
+			{
+				break;
+			}
+			if (locked == null || !locked.contains(m.getReward()))
+			{
+				out.add(m.getReward());
+			}
 		}
 		return out;
 	}

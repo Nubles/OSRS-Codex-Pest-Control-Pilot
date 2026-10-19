@@ -137,6 +137,9 @@ public final class View
 	/** The levels Codex Navigator's pinned goals need in those skills; empty without Navigator. */
 	public List<com.codex.pestcontrol.core.NavigatorGoals.Need> goals = Collections.emptyList();
 
+	/** Whether the void card names the player; off to share it without the name. */
+	public boolean nameOnCard = true;
+
 	/**
 	 * @param fight the game in progress, or null
 	 * @param last the newest finished game, or null
