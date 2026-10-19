@@ -73,6 +73,9 @@ public class Battle
 			return;
 		}
 		shielded[portal.ordinal()] = false;
+		// Readings from behind the shield would make a portal the team has only just reached look stalled.
+		readings.get(portal.ordinal()).clear();
+		ownHits.get(portal.ordinal()).clear();
 		int step = drops.size();
 		drops.add(portal);
 		dropTicks.add(at);

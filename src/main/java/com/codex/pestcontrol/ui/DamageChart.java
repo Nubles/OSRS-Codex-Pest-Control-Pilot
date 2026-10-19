@@ -45,7 +45,7 @@ class DamageChart extends JComponent
 			most = Math.max(most, game.getDamage());
 		}
 		int floor = h - 1;
-		int top = fm.getAscent() + 2;
+		int top = fm.getHeight() + 3;
 		int span = floor - top;
 		g.setColor(Theme.alpha(Theme.GOLD, 40));
 		g.fillRect(0, floor, w, 1);
@@ -67,8 +67,13 @@ class DamageChart extends JComponent
 		g.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, new float[]{3, 3}, 0));
 		g.setColor(Theme.alpha(Theme.TEXT, 150));
 		g.drawLine(0, line, w, line);
+		// The line's key sits in the top corner, clear of the bars.
 		String label = Battle.DAMAGE_FOR_POINTS + " for points";
-		Ui.shadowed(g, label, w - fm.stringWidth(label), line - 3, Theme.TEXT_MUTED);
+		int lx = w - fm.stringWidth(label);
+		g.drawLine(lx - 16, fm.getAscent() / 2 + 1, lx - 4, fm.getAscent() / 2 + 1);
+		g.setStroke(new BasicStroke(1f));
+		g.setColor(Theme.TEXT_MUTED);
+		g.drawString(label, lx, fm.getAscent());
 		String peak = String.valueOf(most);
 		g.setColor(Theme.TEXT_FAINT);
 		g.drawString(peak, 0, fm.getAscent());

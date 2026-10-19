@@ -108,4 +108,25 @@ public class TeamPaceTest
 		}
 		assertEquals(Portal.BLUE, b.advise(null).getPortal());
 	}
+
+	@Test
+	public void aPortalJustOpenedIsNotStalledByItsShieldedReadings()
+	{
+		Battle b = new Battle();
+		b.shieldDropped(Portal.PURPLE);
+		b.addDamage(60);
+		for (int t = 0; t < 12; t++)
+		{
+			b.tick();
+			b.setHealth(Portal.PURPLE, 200 - 5 * t);
+			// Blue sits behind its shield at full health.
+			b.setHealth(Portal.BLUE, 250);
+		}
+		b.shieldDropped(Portal.BLUE);
+		b.tick();
+		b.setHealth(Portal.PURPLE, 140);
+		b.setHealth(Portal.BLUE, 250);
+		assertEquals(-1, b.secondsToFall(Portal.BLUE));
+		assertEquals(Portal.PURPLE, b.advise(null).getPortal());
+	}
 }
