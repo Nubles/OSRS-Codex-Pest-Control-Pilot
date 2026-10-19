@@ -209,6 +209,11 @@ public class CodexPestControlPlugin extends Plugin
 	/** A game whose status bar has gone, waiting a few ticks for its closing messages. */
 	private Battle ending;
 	private final GameWatch watch = new GameWatch();
+	/**
+	 * The connection dropped and the scene is being sent again: a portal that spawns open may have
+	 * dropped its shield while the connection was gone, so when is not known. Until the first tick back.
+	 */
+	private boolean rejoining;
 	private Result result = new Result();
 	private Boat landerBoat;
 	private boolean inLander;
@@ -320,6 +325,7 @@ public class CodexPestControlPlugin extends Plugin
 		{
 			// A dropped connection the client gets back puts you in the same game: it is held, not
 			// ended, and carries on with your damage. Logging out or hopping leaves it.
+			rejoining = state == GameState.CONNECTION_LOST;
 			if (state != GameState.CONNECTION_LOST)
 			{
 				if (battle != null && logbook != null)
@@ -444,7 +450,11 @@ public class CodexPestControlPlugin extends Plugin
 		{
 			Portal p = Portal.values()[open];
 			portals.put(p, npc);
-			if (battle != null)
+			if (battle != null && rejoining)
+			{
+				battle.foundOpen(p);
+			}
+			else if (battle != null)
 			{
 				battle.shieldDropped(p);
 			}
@@ -586,11 +596,13 @@ public class CodexPestControlPlugin extends Plugin
 		if (battle != null && portals.isEmpty())
 		{
 			// Back from a dropped connection, the scene was loaded afresh: find the portals again.
+			rejoining |= watch.isBusy();
 			for (NPC npc : client.getTopLevelWorldView().npcs())
 			{
 				track(npc);
 			}
 		}
+		rejoining = false;
 
 		if (battle != null)
 		{
