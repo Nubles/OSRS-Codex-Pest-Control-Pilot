@@ -70,6 +70,8 @@ class Wardrobe extends JComponent
 	private final boolean pointsKnown;
 	private final boolean elite;
 	private final ItemIcons icons;
+	/** Handed over each time an icon is asked for, so a row waiting on a picture is told once. */
+	private final Runnable repaint = this::repaint;
 	private final String title;
 
 	/**
@@ -322,7 +324,7 @@ class Wardrobe extends JComponent
 		{
 			return;
 		}
-		BufferedImage icon = icons == null ? null : icons.get(r.getIcon(), this::repaint);
+		BufferedImage icon = icons == null ? null : icons.get(r.getIcon(), repaint);
 		if (icon != null)
 		{
 			Composite was = g.getComposite();

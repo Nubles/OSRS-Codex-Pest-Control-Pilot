@@ -24,6 +24,8 @@ class MilestoneRow extends JComponent
 	private final boolean last;
 	private final boolean locked;
 	private final ItemIcons icons;
+	/** Handed over each time an icon is asked for, so a row waiting on a picture is told once. */
+	private final Runnable repaint = this::repaint;
 
 	MilestoneRow(Outlook.Milestone milestone, boolean first, boolean last, boolean locked, ItemIcons icons)
 	{
@@ -69,7 +71,7 @@ class MilestoneRow extends JComponent
 		}
 
 		int tx = 22;
-		BufferedImage icon = icons == null ? null : icons.get(milestone.getReward().getIcon(), this::repaint);
+		BufferedImage icon = icons == null ? null : icons.get(milestone.getReward().getIcon(), repaint);
 		if (icon != null)
 		{
 			int s = 24;
