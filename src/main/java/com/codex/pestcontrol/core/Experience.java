@@ -183,6 +183,18 @@ public final class Experience
 	}
 
 	/**
+	 * Games it takes to earn the points for some experience, after the goal: points the goal leaves
+	 * spare count first, and the points the goal still needs are earned before any go to experience.
+	 *
+	 * @return the games, 0 when the spare points already cover it
+	 */
+	public static int gamesFor(Outlook outlook, int points)
+	{
+		long earn = (long) points - spare(outlook) + outlook.getRemaining();
+		return earn <= 0 ? 0 : (int) Math.ceil(earn / Math.max(0.5, outlook.getPerGame()));
+	}
+
+	/**
 	 * What the points buy in every skill, the most experience first and skills below 25 last.
 	 *
 	 * @param levels each skill's real level, in {@link Skill} order

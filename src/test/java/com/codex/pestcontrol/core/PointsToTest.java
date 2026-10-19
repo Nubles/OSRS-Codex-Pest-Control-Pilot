@@ -34,4 +34,20 @@ public class PointsToTest
 		long atSixty = (Experience.xpFor(80) - Experience.xpFor(60)) / (Experience.perPoint(Experience.Skill.ATTACK, 60) * 110L / 100);
 		assertEquals(true, points < atSixty);
 	}
+
+	@Test
+	public void experiencePointsComeAfterTheGoalStillToBuy()
+	{
+		// 100 points held toward a 250-point top: 150 more go to the top before any buy experience.
+		Outlook saving = Outlook.of(java.util.EnumSet.of(Reward.TOP), java.util.EnumSet.noneOf(Reward.class), 100, 5, 10, true);
+		assertEquals((150 + 200) / 5, Experience.gamesFor(saving, 200));
+		// With the top covered, the 40 spare points count first.
+		Outlook covered = Outlook.of(java.util.EnumSet.of(Reward.TOP), java.util.EnumSet.noneOf(Reward.class), 290, 5, 10, true);
+		assertEquals(0, Experience.gamesFor(covered, 40));
+		assertEquals(2, Experience.gamesFor(covered, 50));
+		// Points not seen yet: every point is still to earn.
+		Outlook unseen = Outlook.of(java.util.EnumSet.noneOf(Reward.class), java.util.EnumSet.noneOf(Reward.class), -1, 5, 10, true);
+		assertEquals(4, Experience.gamesFor(unseen, 20));
+	}
 }
+

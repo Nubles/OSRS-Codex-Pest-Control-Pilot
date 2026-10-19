@@ -556,7 +556,7 @@ public class PilotPanel extends PluginPanel
 			}
 			else
 			{
-				int games = (int) Math.ceil(Math.max(0, points - spare) / Math.max(0.5, o.getPerGame()));
+				int games = Experience.gamesFor(o, points);
 				long by = habit.afterGames(games, view.now);
 				how = Format.number(points) + " points, " + Format.plural(games, "game", "games") + (by > 0 ? ", " + Format.shortDay(by) : "");
 			}
@@ -574,7 +574,7 @@ public class PilotPanel extends PluginPanel
 		}
 		card.add(rows, BorderLayout.CENTER);
 		stack.add(card);
-		stack.add(Ui.wrapped("Points the goal above leaves spare count first; the rest are earned at your rate.", Theme.small(), Theme.TEXT_FAINT, WIDTH - 16));
+		stack.add(Ui.wrapped("Points the goal above leaves spare count first; the rest are earned at your rate once the goal is bought.", Theme.small(), Theme.TEXT_FAINT, WIDTH - 16));
 	}
 
 	/** The pieces still needed in the order to buy them, each with the games until it can be. */
