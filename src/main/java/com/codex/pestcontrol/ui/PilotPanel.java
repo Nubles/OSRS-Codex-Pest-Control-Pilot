@@ -152,6 +152,11 @@ public class PilotPanel extends PluginPanel
 		}
 		if (o.isAffordable())
 		{
+			if (!locked(o).isEmpty())
+			{
+				crest.update(heading, o.getPoints(), "points", "Points enough; the elite pieces need the diary", "The diary is due", calm, Theme.GOLD);
+				return;
+			}
 			crest.update(heading, o.getPoints(), "points", "Enough for all of it: go and buy", "Enough for all of it", Theme.TEAL, Theme.TEAL);
 			return;
 		}
@@ -429,8 +434,17 @@ public class PilotPanel extends PluginPanel
 		progress.add(meter, BorderLayout.NORTH);
 		JPanel tiles = new JPanel(new GridLayout(1, 3, 6, 0));
 		tiles.setOpaque(false);
-		tiles.add(new StatTile(Format.number(o.getGames()), "Games", "left", o.getGames() == 0 ? Theme.GREEN : Theme.GOLD));
-		tiles.add(new StatTile(o.getGames() == 0 ? "-" : Format.span(o.getMinutes()), "Time", "about", Theme.GOLD));
+		if (o.isGamesKnown())
+		{
+			tiles.add(new StatTile(Format.number(o.getGames()), "Games", "left", o.getGames() == 0 ? Theme.GREEN : Theme.GOLD));
+			tiles.add(new StatTile(o.getGames() == 0 ? "-" : Format.span(o.getMinutes()), "Time", "about", Theme.GOLD));
+		}
+		else
+		{
+			// Unread points are not zero points: no count until a lander reads them.
+			tiles.add(new StatTile("?", "Games", "left", Theme.TEXT_MUTED));
+			tiles.add(new StatTile("?", "Time", "about", Theme.TEXT_MUTED));
+		}
 		tiles.add(new StatTile(String.format(Locale.ENGLISH, o.getPerGame() % 1 == 0 ? "%.0f" : "%.1f", o.getPerGame()), "Per game",
 			o.isMeasured() ? "yours" : "assumed", o.isMeasured() ? Theme.TEAL : Theme.TEXT_MUTED));
 		progress.add(tiles, BorderLayout.CENTER);
@@ -441,9 +455,9 @@ public class PilotPanel extends PluginPanel
 		{
 			south.add(Ui.label("About " + Format.shortDay(by) + " at your pace", Theme.small(), Theme.TEAL));
 		}
-		if (o.getNextBuy() != null && !o.isAffordable())
+		if (!buyable.isEmpty() && !o.isAffordable())
 		{
-			south.add(Ui.wrapped("You can already buy the " + o.getNextBuy().getTitle().toLowerCase(Locale.ENGLISH) + ".", Theme.small(), Theme.TEAL, WIDTH - 30));
+			south.add(Ui.wrapped(canBuy(buyable), Theme.small(), Theme.TEAL, WIDTH - 30));
 		}
 		else if (o.isOverCap())
 		{
@@ -699,6 +713,25 @@ public class PilotPanel extends PluginPanel
 		return buttons;
 	}
 
+	/**
+	 * What the points buy now: one piece by name, or several with why these, since the buy order
+	 * spends as much of the points as it can rather than taking the dearest piece first.
+	 */
+	static String canBuy(java.util.Set<Reward> buyable)
+	{
+		List<String> names = new ArrayList<>();
+		for (Reward r : buyable)
+		{
+			names.add(r.getShortTitle().toLowerCase(Locale.ENGLISH));
+		}
+		if (names.size() == 1)
+		{
+			return "You can already buy the " + names.get(0) + ".";
+		}
+		String last = names.remove(names.size() - 1);
+		return "You can already buy the " + String.join(", ", names) + " and " + last + ": together they spend the most of your points.";
+	}
+
 	/** The elite pieces the goal still needs that the diary keeps locked. */
 	private java.util.Set<Reward> locked(Outlook o)
 	{
@@ -735,7 +768,11 @@ public class PilotPanel extends PluginPanel
 		}
 		card.add(rows, BorderLayout.CENTER);
 		stack.add(card);
+		stack.add(Ui.wrapped(ORDER_RULE, Theme.small(), Theme.TEXT_FAINT, WIDTH - 16));
 	}
+
+	/** How the buy order is chosen, under it. */
+	static final String ORDER_RULE = "First the pieces your points buy together, the set that spends the most of them, so the knights hold as few as they can. Then the cheapest first.";
 
 	/**
 	 * A line when another lander you can board has earned you clearly more points an hour than the

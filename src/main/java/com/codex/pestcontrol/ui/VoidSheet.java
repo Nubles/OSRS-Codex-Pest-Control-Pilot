@@ -60,9 +60,10 @@ public final class VoidSheet
 	 * left and when, the points a game, and the pieces owned. A goal already bought, or one with
 	 * no points read yet, still fills the column.
 	 *
+	 * @param elite whether the hard diary is done, so elite pieces can be bought
 	 * @param by when the goal is likely bought at the player's pace, or 0 when not known
 	 */
-	static List<Fact> facts(Outlook o, Set<Reward> goal, Set<Reward> owned, long by)
+	static List<Fact> facts(Outlook o, Set<Reward> goal, Set<Reward> owned, boolean elite, long by)
 	{
 		List<Fact> out = new ArrayList<>();
 		String held = o.isPointsKnown() ? Format.number(o.getPoints()) : "?";
@@ -71,9 +72,20 @@ public final class VoidSheet
 		{
 			out.add(new Fact("Games left", "None", "the set is yours", Theme.GREEN));
 		}
+		else if (!o.isGamesKnown())
+		{
+			out.add(new Fact("Games left", "?", "points not read yet", Theme.TEXT_MUTED));
+		}
 		else if (o.getGames() == 0)
 		{
-			out.add(new Fact("Games left", "None", "points enough now", Theme.TEAL));
+			// Points that cover elite pieces the hard diary still locks do not buy them yet.
+			boolean locked = false;
+			for (Reward r : o.getNeeded())
+			{
+				locked |= r.isElite() && !elite;
+			}
+			out.add(locked ? new Fact("Games left", "None", "the diary comes first", Theme.EMBER)
+				: new Fact("Games left", "None", "points enough now", Theme.TEAL));
 		}
 		else
 		{
@@ -121,7 +133,7 @@ public final class VoidSheet
 	public static BufferedImage render(String title, String player, Outlook o, Set<Reward> goal, Set<Reward> owned, Set<Reward> buyable,
 		boolean elite, long by, long now, ItemIcons icons)
 	{
-		List<Fact> facts = facts(o, goal, owned, by);
+		List<Fact> facts = facts(o, goal, owned, elite, by);
 		Wardrobe wardrobe = new Wardrobe(title == null ? "your goal" : title, goal, owned, buyable, Math.max(0, o.getPoints()),
 			o.isPointsKnown(), elite, icons, null);
 		int wardrobeH = wardrobe.getPreferredSize().height;

@@ -30,18 +30,66 @@ public final class Outlook
 		this.perGame = perGame;
 		this.measured = measured;
 		this.remaining = Math.max(0, cost - Math.max(0, points));
-		this.games = remaining == 0 ? 0 : (int) Math.ceil(remaining / perGame);
+		// Unread points are not zero points, so the games are only counted once they are read.
+		this.games = points < 0 && !needed.isEmpty() ? -1 : remaining == 0 ? 0 : (int) Math.ceil(remaining / perGame);
 		this.minutesPerGame = minutesPerGame;
-		this.minutes = games * minutesPerGame;
-		Reward cheapest = null;
-		for (Reward r : needed)
+		this.minutes = games < 0 ? -1 : games * minutesPerGame;
+		List<Reward> best = bestSet(needed, Math.max(0, points));
+		this.nextBuy = best.isEmpty() ? null : best.get(0);
+	}
+
+	/**
+	 * The pieces that together spend the most of the points held, dearest first. Ties go to fewer
+	 * pieces, then to the pieces earlier in the reward list. A goal has at most ten pieces, so every
+	 * set is tried.
+	 */
+	static List<Reward> bestSet(List<Reward> pieces, int held)
+	{
+		List<Reward> sorted = new ArrayList<>(pieces);
+		// Stable: pieces of the same cost keep the reward order.
+		sorted.sort((a, b) -> Integer.compare(b.getCost(), a.getCost()));
+		int n = Math.min(sorted.size(), 16);
+		int bestMask = 0;
+		int bestSum = 0;
+		int bestCount = 0;
+		for (int mask = 1; mask < 1 << n; mask++)
 		{
-			if (r.getCost() <= points && (cheapest == null || r.getCost() > cheapest.getCost()))
+			int sum = 0;
+			for (int i = 0; i < n && sum <= held; i++)
 			{
-				cheapest = r;
+				if ((mask & 1 << i) != 0)
+				{
+					sum += sorted.get(i).getCost();
+				}
+			}
+			if (sum > held || sum < bestSum)
+			{
+				continue;
+			}
+			int count = Integer.bitCount(mask);
+			if (sum > bestSum || count < bestCount || count == bestCount && earlier(mask, bestMask))
+			{
+				bestMask = mask;
+				bestSum = sum;
+				bestCount = count;
 			}
 		}
-		this.nextBuy = cheapest;
+		List<Reward> out = new ArrayList<>();
+		for (int i = 0; i < n; i++)
+		{
+			if ((bestMask & 1 << i) != 0)
+			{
+				out.add(sorted.get(i));
+			}
+		}
+		return out;
+	}
+
+	/** Whether set a holds the first piece, in order, that the two sets do not share. */
+	private static boolean earlier(int a, int b)
+	{
+		int diff = a ^ b;
+		return diff != 0 && (a & Integer.lowestOneBit(diff)) != 0;
 	}
 
 	/**
@@ -97,11 +145,18 @@ public final class Outlook
 		return points >= 0;
 	}
 
+	/** Whether the games left can be counted: not before the points held are read. */
+	public boolean isGamesKnown()
+	{
+		return games >= 0;
+	}
+
 	public int getRemaining()
 	{
 		return remaining;
 	}
 
+	/** Games until the points cover the whole goal: 0 when they do, -1 before the points are read. */
 	public int getGames()
 	{
 		return games;
@@ -142,7 +197,7 @@ public final class Outlook
 		return !needed.isEmpty() && remaining == 0;
 	}
 
-	/** The dearest needed piece the points already cover, or null. */
+	/** The dearest piece of the set the points buy together, locked or not, or null. */
 	public Reward getNextBuy()
 	{
 		return nextBuy;
@@ -181,7 +236,7 @@ public final class Outlook
 			return total;
 		}
 
-		/** Games until it can be bought, 0 when it can be already. */
+		/** Games until it can be bought, 0 when it can be already, -1 before the points are read. */
 		public int getGames()
 		{
 			return games;
@@ -194,10 +249,12 @@ public final class Outlook
 	}
 
 	/**
-	 * The pieces still needed in the order to buy them. Whenever the points held cover a piece, the
-	 * dearest one they cover comes next (the same piece the outlook names as buyable now), so the
-	 * Void Knights hold as few points as they can; otherwise the cheapest, as it is yours soonest.
-	 * Pieces in the given set (elite pieces still locked behind the diary) go last.
+	 * The pieces still needed in the order to buy them. First the pieces the points held buy
+	 * together, choosing the set that spends the most of them, so the Void Knights hold as few
+	 * points as they can: 400 points toward a top and two helms buy both helms, not the top and
+	 * 150 left over. The rest follow cheapest first, as each is yours soonest. Pieces in the given
+	 * set (elite pieces still locked behind the diary) go last. Before the points are read no
+	 * piece is timed: each one's games are -1.
 	 */
 	public List<Milestone> milestones(Set<Reward> last)
 	{
@@ -210,23 +267,11 @@ public final class Outlook
 		// Stable sorts keep the reward order between pieces of the same cost.
 		open.sort((a, b) -> Integer.compare(a.getCost(), b.getCost()));
 		later.sort((a, b) -> Integer.compare(a.getCost(), b.getCost()));
-		List<Reward> order = new ArrayList<>();
 		int held = Math.max(0, points);
-		int spent = 0;
-		while (!open.isEmpty())
-		{
-			Reward next = open.get(0);
-			for (Reward r : open)
-			{
-				if (r.getCost() <= held - spent && r.getCost() > next.getCost())
-				{
-					next = r;
-				}
-			}
-			open.remove(next);
-			order.add(next);
-			spent += next.getCost();
-		}
+		List<Reward> order = new ArrayList<>(bestSet(open, held));
+		open.removeAll(order);
+		// Nothing left fits in what the set leaves, or the set would have taken it.
+		order.addAll(open);
 		order.addAll(later);
 		List<Milestone> out = new ArrayList<>();
 		int total = 0;
@@ -234,17 +279,18 @@ public final class Outlook
 		{
 			total += r.getCost();
 			int shortfall = Math.max(0, total - held);
-			int g = shortfall == 0 ? 0 : (int) Math.ceil(shortfall / perGame);
-			out.add(new Milestone(r, total, g, g * minutesPerGame));
+			int g = !isPointsKnown() ? -1 : shortfall == 0 ? 0 : (int) Math.ceil(shortfall / perGame);
+			out.add(new Milestone(r, total, g, g < 0 ? -1 : g * minutesPerGame));
 		}
 		return out;
 	}
 
 	/**
-	 * The pieces the points held buy now, together: those the buy order reaches before the points
-	 * run out. With 412 points toward a top, a robe and a helm, that is the top alone, not each of
-	 * the three that 412 would cover on its own. Pieces in {@code locked} (elite ones behind the
-	 * diary) are never among them; unknown points buy nothing.
+	 * The pieces the points held buy now, together: the set that spends the most of them, which
+	 * the buy order starts with. With 412 points toward a top, a robe and a helm, that is the top
+	 * alone, not each of the three that 412 would cover on its own; with 400 toward a top and two
+	 * helms, it is the two helms. Pieces in {@code locked} (elite ones behind the diary) are never
+	 * among them; unknown points buy nothing.
 	 */
 	public Set<Reward> buyableNow(Set<Reward> locked)
 	{

@@ -19,7 +19,7 @@ public class VoidSheetTest
 	{
 		Set<Reward> owned = EnumSet.of(Reward.GLOVES);
 		Outlook o = Outlook.of(MELEE, owned, 412, 4.6, 3.5, true);
-		List<VoidSheet.Fact> facts = VoidSheet.facts(o, MELEE, owned, 0);
+		List<VoidSheet.Fact> facts = VoidSheet.facts(o, MELEE, owned, true, 0);
 		assertEquals(4, facts.size());
 		assertEquals("Points", facts.get(0).label);
 		assertEquals("412", facts.get(0).value);
@@ -34,7 +34,7 @@ public class VoidSheetTest
 	public void enoughPointsSaysNoGamesAreLeft()
 	{
 		Outlook o = Outlook.of(MELEE, EnumSet.noneOf(Reward.class), 2000, 4, 3.5, false);
-		List<VoidSheet.Fact> facts = VoidSheet.facts(o, MELEE, EnumSet.noneOf(Reward.class), 0);
+		List<VoidSheet.Fact> facts = VoidSheet.facts(o, MELEE, EnumSet.noneOf(Reward.class), true, 0);
 		assertEquals("None", facts.get(1).value);
 		assertEquals("points enough now", facts.get(1).note);
 		assertEquals("4", facts.get(2).value);
@@ -56,5 +56,38 @@ public class VoidSheetTest
 		{
 			assertTrue(r + " is waited for", ids.contains(r.getIcon()));
 		}
+	}
+
+	@Test
+	public void piecesLockedBehindTheDiaryAreNotPointsEnoughNow()
+	{
+		// Everything but the elite top and robe is owned, and 500 points cover their 400, but
+		// without the hard diary neither can be bought.
+		Set<Reward> goal = EnumSet.copyOf(Goal.ELITE.getRewards());
+		Set<Reward> owned = EnumSet.of(Reward.GLOVES, Reward.RANGER_HELM);
+		Outlook o = Outlook.of(goal, owned, 500, 4, 3.5, true);
+		VoidSheet.Fact games = VoidSheet.facts(o, goal, owned, false, 0).get(1);
+		assertEquals("Games left", games.label);
+		assertTrue(games.note, !games.note.contains("points enough now"));
+		assertTrue(games.note, games.note.contains("diary"));
+		// With the diary done the same points are enough now.
+		assertEquals("points enough now", VoidSheet.facts(o, goal, owned, true, 0).get(1).note);
+	}
+
+	@Test
+	public void unreadPointsLeaveTheGamesUnknown()
+	{
+		Outlook o = Outlook.of(MELEE, EnumSet.noneOf(Reward.class), -1, 4, 3.5, false);
+		VoidSheet.Fact games = VoidSheet.facts(o, MELEE, EnumSet.noneOf(Reward.class), true, 0).get(1);
+		assertEquals("?", games.value);
+		assertTrue(games.note, games.note.contains("points"));
+	}
+
+	@Test
+	public void thePanelNamesWhatThePointsBuyAndWhy()
+	{
+		assertEquals("You can already buy the top.", PilotPanel.canBuy(EnumSet.of(Reward.TOP)));
+		assertEquals("You can already buy the melee helm and ranger helm: together they spend the most of your points.",
+			PilotPanel.canBuy(EnumSet.of(Reward.RANGER_HELM, Reward.MELEE_HELM)));
 	}
 }

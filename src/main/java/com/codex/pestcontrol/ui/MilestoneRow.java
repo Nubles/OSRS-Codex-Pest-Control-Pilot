@@ -81,8 +81,9 @@ class MilestoneRow extends JComponent
 
 		g.setFont(Theme.small());
 		FontMetrics small = g.getFontMetrics();
-		String when = locked ? "diary" : ready ? "now" : Format.plural(milestone.getGames(), "game", "games");
-		String time = locked || ready ? null : Format.span(milestone.getMinutes());
+		boolean unknown = milestone.getGames() < 0;
+		String when = locked ? "diary" : ready ? "now" : unknown ? "?" : Format.plural(milestone.getGames(), "game", "games");
+		String time = locked || ready || unknown ? null : Format.span(milestone.getMinutes());
 		int rw = Math.max(small.stringWidth(when), time == null ? 0 : small.stringWidth(time));
 		g.setFont(Theme.body());
 		FontMetrics body = g.getFontMetrics();
