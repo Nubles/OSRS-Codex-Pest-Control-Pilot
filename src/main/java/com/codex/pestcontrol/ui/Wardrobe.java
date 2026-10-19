@@ -1,5 +1,6 @@
 package com.codex.pestcontrol.ui;
 
+import com.codex.pestcontrol.core.Outlook;
 import com.codex.pestcontrol.core.Reward;
 import java.awt.AlphaComposite;
 import java.awt.BasicStroke;
@@ -15,7 +16,10 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.RoundRectangle2D;
 import java.awt.image.BufferedImage;
+import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 import javax.swing.JComponent;
@@ -210,7 +214,7 @@ class Wardrobe extends JComponent
 			case CAN_BUY:
 				return r.getTitle() + ": you can buy it now (" + r.getCost() + " points). Click to take it out of your goal";
 			case WANTED:
-				return r.getTitle() + ": " + (pointsKnown ? Math.max(0, r.getCost() - spare()) + " points to go once the pieces before it are bought"
+				return r.getTitle() + ": " + (pointsKnown ? toGo(r, goal, owned, points, elite) + " points to go, counting the pieces before it"
 					: r.getCost() + " points") + ". Click to take it out of your goal";
 			case LOCKED:
 				return r.getTitle() + ": needs the hard Western Provinces diary";
@@ -274,15 +278,41 @@ class Wardrobe extends JComponent
 		g.dispose();
 	}
 
-	/** The points left once the pieces that can be bought now are. */
-	private int spare()
+	/**
+	 * The points the buy order spends on the pieces before each needed one, the same order the Buy
+	 * order list gives: elite pieces still behind the diary come last.
+	 */
+	static Map<Reward, Integer> ahead(Set<Reward> goal, Set<Reward> owned, int points, boolean elite)
 	{
-		int left = Math.max(0, points);
-		for (Reward r : buyable)
+		Set<Reward> locked = EnumSet.noneOf(Reward.class);
+		for (Reward r : goal)
 		{
-			left -= r.getCost();
+			if (r.isElite() && !elite && !owned.contains(r))
+			{
+				locked.add(r);
+			}
 		}
-		return Math.max(0, left);
+		Map<Reward, Integer> out = new EnumMap<>(Reward.class);
+		for (Outlook.Milestone m : Outlook.of(goal, owned, Math.max(0, points), 1, 0, false).milestones(locked))
+		{
+			out.put(m.getReward(), m.getTotal() - m.getReward().getCost());
+		}
+		return out;
+	}
+
+	/** The points still to earn before a needed piece can be bought, the pieces before it counted. */
+	static int toGo(Reward r, Set<Reward> goal, Set<Reward> owned, int points, boolean elite)
+	{
+		Integer before = ahead(goal, owned, points, elite).get(r);
+		return Math.max(0, (before == null ? 0 : before) + r.getCost() - Math.max(0, points));
+	}
+
+	/** How much of a needed piece is saved toward once the pieces before it are bought, from 0 to 1. */
+	static double saved(Reward r, Set<Reward> goal, Set<Reward> owned, int points, boolean elite)
+	{
+		Integer before = ahead(goal, owned, points, elite).get(r);
+		double left = Math.max(0, points) - (before == null ? 0 : before);
+		return Math.max(0, Math.min(1, left / r.getCost()));
 	}
 
 	/**
@@ -378,8 +408,8 @@ class Wardrobe extends JComponent
 		else if (look == Look.WANTED || look == Look.CAN_BUY)
 		{
 			// The points saved toward it, as a bar along the slot's foot.
-			// A piece waiting its turn counts only what is left once those that can be bought now are.
-			double share = look == Look.CAN_BUY ? 1 : pointsKnown ? Math.max(0, Math.min(1, spare() / (double) r.getCost())) : 0;
+			// A piece waiting its turn counts only what is left once the pieces before it in the order are bought.
+			double share = look == Look.CAN_BUY ? 1 : pointsKnown ? saved(r, goal, owned, points, elite) : 0;
 			int bw = SLOT_W - 8;
 			g.setColor(Theme.alpha(Theme.INK_DEEP, 220));
 			g.fillRect(x + 4, y + SLOT_H - 5, bw, 2);
