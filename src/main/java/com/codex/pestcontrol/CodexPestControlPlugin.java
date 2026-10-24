@@ -1,7 +1,9 @@
 package com.codex.pestcontrol;
 
 import com.codex.pestcontrol.core.Advice;
+import com.codex.pestcontrol.core.Alerts;
 import com.codex.pestcontrol.core.Battle;
+import com.codex.pestcontrol.core.Boarding;
 import com.codex.pestcontrol.core.Boat;
 import com.codex.pestcontrol.core.Experience;
 import com.codex.pestcontrol.core.Field;
@@ -23,6 +25,7 @@ import com.codex.pestcontrol.core.VoidCheck;
 import com.codex.pestcontrol.overlay.MinimapMarker;
 import com.codex.pestcontrol.overlay.PilotPlaque;
 import com.codex.pestcontrol.overlay.PortalMarker;
+import com.codex.pestcontrol.overlay.RewardShopGuide;
 import com.codex.pestcontrol.ui.Actions;
 import com.codex.pestcontrol.ui.Format;
 import com.codex.pestcontrol.ui.ItemIcons;
@@ -74,6 +77,7 @@ import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.NpcID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.widgets.Widget;
+import net.runelite.client.Notifier;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatColorType;
 import net.runelite.client.chat.ChatMessageBuilder;
@@ -192,6 +196,12 @@ public class CodexPestControlPlugin extends Plugin
 	@Inject
 	private MinimapMarker minimap;
 
+	@Inject
+	private RewardShopGuide shopGuide;
+
+	@Inject
+	private Notifier notifier;
+
 	private final PilotPlaque plaque = new PilotPlaque();
 	private final Map<Portal, NPC> portals = new EnumMap<>(Portal.class);
 	private final List<NPC> spinners = new ArrayList<>();
@@ -217,6 +227,8 @@ public class CodexPestControlPlugin extends Plugin
 	/** A game whose status bar has gone, waiting a few ticks for its closing messages. */
 	private Battle ending;
 	private final GameWatch watch = new GameWatch();
+	private final Alerts alerts = new Alerts();
+	private final Boarding boarding = new Boarding();
 	/**
 	 * The connection dropped and the scene is being sent again: a portal that spawns open may have
 	 * dropped its shield while the connection was gone, so when is not known. Until the first tick back.
@@ -260,6 +272,7 @@ public class CodexPestControlPlugin extends Plugin
 		overlayManager.add(plaque);
 		overlayManager.add(marker);
 		overlayManager.add(minimap);
+		overlayManager.add(shopGuide);
 		clientThread.invokeLater(() ->
 		{
 			loadProfile();
@@ -283,6 +296,7 @@ public class CodexPestControlPlugin extends Plugin
 		overlayManager.remove(plaque);
 		overlayManager.remove(marker);
 		overlayManager.remove(minimap);
+		overlayManager.remove(shopGuide);
 		clientToolbar.removeNavigation(navButton);
 		clientThread.invokeLater(() ->
 		{
@@ -581,10 +595,12 @@ public class CodexPestControlPlugin extends Plugin
 						battle.foundOpen(e.getKey());
 					}
 				}
+				notifier.notify(config.notifyStart(), alerts.start(battle).getMessage());
 				break;
 			case RESUME:
 				battle = ending != null ? ending : new Battle();
 				ending = null;
+				alerts.resume(battle);
 				break;
 			case SETTLE:
 				ending = battle;
@@ -628,6 +644,10 @@ public class CodexPestControlPlugin extends Plugin
 			{
 				battle.setKnightHealth(knight);
 			}
+			for (Alerts.Alert a : alerts.check(battle, config.knightWarn()))
+			{
+				notifier.notify(a.getKind() == Alerts.Kind.SHIELD ? config.notifyShield() : config.notifyKnight(), a.getMessage());
+			}
 			dirty = true;
 		}
 
@@ -645,6 +665,15 @@ public class CodexPestControlPlugin extends Plugin
 			{
 				landerBoat = boat;
 			}
+			boolean quiet = boarding.isQuiet(client.getWorld());
+			int ready = boarding.getReady();
+			Widget readyLine = client.getWidget(InterfaceID.PestLanderOverlay.PEST_LANDER_OVER_PL);
+			boarding.tick(readyLine == null ? null : readyLine.getText());
+			dirty |= quiet != boarding.isQuiet(client.getWorld()) || ready != boarding.getReady();
+		}
+		else
+		{
+			boarding.leave();
 		}
 		if (lander != inLander)
 		{
@@ -756,16 +785,13 @@ public class CodexPestControlPlugin extends Plugin
 			.build());
 	}
 
-	private void announce(Outlook before, Outlook after)
+	/** The goal's elite pieces while the hard Western Provinces diary still locks them. */
+	private Set<Reward> locked(Outlook o)
 	{
-		if (!config.announce() || after == null)
-		{
-			return;
-		}
 		Set<Reward> locked = EnumSet.noneOf(Reward.class);
 		if (client.getVarbitValue(VarbitID.WESTERN_DIARY_HARD_COMPLETE) != 1)
 		{
-			for (Reward r : after.getNeeded())
+			for (Reward r : o.getNeeded())
 			{
 				if (r.isElite())
 				{
@@ -773,7 +799,16 @@ public class CodexPestControlPlugin extends Plugin
 				}
 			}
 		}
-		String text = GameSummary.announcement(before, after, locked);
+		return locked;
+	}
+
+	private void announce(Outlook before, Outlook after)
+	{
+		if (!config.announce() || after == null)
+		{
+			return;
+		}
+		String text = GameSummary.announcement(before, after, locked(after));
 		if (text == null)
 		{
 			return;
@@ -1086,6 +1121,7 @@ public class CodexPestControlPlugin extends Plugin
 		{
 			plaque.show(null);
 			marker.show(null);
+			shopGuide.show(null);
 			if (target != null)
 			{
 				View view = logbook == null ? View.loggedOut() : view(View.State.LOGGED_OUT, null, now);
@@ -1115,8 +1151,10 @@ public class CodexPestControlPlugin extends Plugin
 		boolean outpost = me != null && me.getWorldLocation().getRegionID() == OUTPOST_REGION;
 		View.State state = battle != null ? View.State.BATTLE : inLander ? View.State.LANDER : outpost ? View.State.OUTPOST : View.State.AWAY;
 		View view = view(state, fight, now);
-		showPlaque(state, advice, battle, outlook(), Goal.matching(logbook.getGoal()), view.voidCheck);
+		Outlook outlook = outlook();
+		showPlaque(state, advice, battle, outlook, Goal.matching(logbook.getGoal()), view.voidCheck);
 		showMarker(advice);
+		showShop(outlook);
 		if (target != null)
 		{
 			SwingUtilities.invokeLater(() -> target.update(view));
@@ -1230,6 +1268,8 @@ public class CodexPestControlPlugin extends Plugin
 		view.goals = navigatorNeeds(view.levels);
 		view.voidCheck = battle == null && me != null ? VoidCheck.of(worn, style(), owned()) : null;
 		view.nameOnCard = config.nameOnCard();
+		view.ready = state == View.State.LANDER ? boarding.getReady() : -1;
+		view.landerTip = state == View.State.LANDER && boarding.isQuiet(client.getWorld()) ? boarding.tip() : null;
 		return view;
 	}
 
@@ -1292,6 +1332,11 @@ public class CodexPestControlPlugin extends Plugin
 			plaque.show(new PilotPlaque.Shown("VOID CHECK", voidCheck.getHeadline(), Theme.EMBER, voidCheck.getDetail(), null, null));
 			return;
 		}
+		if (state == View.State.LANDER && boarding.isQuiet(client.getWorld()))
+		{
+			plaque.show(new PilotPlaque.Shown("QUIET LANDER", "Try world " + Boarding.PEST_CONTROL_WORLD, Theme.GOLD_BRIGHT, boarding.tip(), null, null));
+			return;
+		}
 		String goal = preset != null ? preset.getTitle() : "Your goal";
 		if (o == null || !o.isPointsKnown())
 		{
@@ -1301,6 +1346,20 @@ public class CodexPestControlPlugin extends Plugin
 		String detail = goalDetail(o, client.getVarbitValue(VarbitID.WESTERN_DIARY_HARD_COMPLETE) == 1);
 		plaque.show(new PilotPlaque.Shown("PEST CONTROL", Format.number(o.getPoints()) + " points", Theme.GOLD_BRIGHT,
 			goal + ": " + detail, null, null));
+	}
+
+	private void showShop(Outlook o)
+	{
+		if (!config.markShop() || o == null || !o.isPointsKnown() || o.isComplete())
+		{
+			shopGuide.show(null);
+			return;
+		}
+		Set<Reward> locked = locked(o);
+		Set<Reward> goal = EnumSet.noneOf(Reward.class);
+		goal.addAll(o.getNeeded());
+		goal.removeAll(locked);
+		shopGuide.show(new RewardShopGuide.Guide(o.buyableNow(locked), goal));
 	}
 
 	private void showMarker(Advice advice)

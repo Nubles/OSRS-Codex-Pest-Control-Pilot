@@ -284,7 +284,17 @@ public class PilotPanel extends PluginPanel
 			map.setFight(null);
 			if (view.state == View.State.LANDER)
 			{
-				stack.add(note("Waiting in the lander", "When the game starts the Pilot charts the island and tells you which portal to work, marking it in the world and on the minimap."));
+				if (view.landerTip != null)
+				{
+					stack.add(note("A quiet lander", view.landerTip + ". The Pilot takes over once a game starts."));
+				}
+				else
+				{
+					int need = com.codex.pestcontrol.core.Boarding.MIN_PLAYERS;
+					String ready = view.ready < 0 ? "" : view.ready >= need ? view.ready + " aboard, enough for a game. "
+						: view.ready + " aboard; a game needs " + need + ". ";
+					stack.add(note("Waiting in the lander", ready + "When the game starts the Pilot charts the island and tells you which portal to work, marking it in the world and on the minimap."));
+				}
 			}
 			else if (view.state == View.State.OUTPOST)
 			{

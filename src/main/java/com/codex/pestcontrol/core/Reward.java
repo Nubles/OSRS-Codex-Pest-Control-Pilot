@@ -91,4 +91,48 @@ public enum Reward
 		}
 		return null;
 	}
+
+	/**
+	 * The reward a line of the Void Knights' reward shop offers, from its words or the item it
+	 * draws, or null. Words are matched loosely ("Void Knight Mage Helm" is the mage helm), elite
+	 * pieces first so "Elite void top" is never read as the plain top.
+	 */
+	public static Reward inShop(String text, int itemId)
+	{
+		if (itemId > 0)
+		{
+			for (Reward r : values())
+			{
+				if (r.isOwnedBy(itemId))
+				{
+					return r;
+				}
+			}
+		}
+		if (text == null || text.isEmpty())
+		{
+			return null;
+		}
+		String words = loose(text);
+		if (words.isEmpty())
+		{
+			return null;
+		}
+		for (Reward r : SHOP_ORDER)
+		{
+			if (words.contains(loose(r.title)))
+			{
+				return r;
+			}
+		}
+		return null;
+	}
+
+	private static final Reward[] SHOP_ORDER = {ELITE_TOP, ELITE_ROBE, TOP, ROBE, GLOVES, MELEE_HELM, RANGER_HELM, MAGE_HELM, MACE, SEAL};
+
+	private static String loose(String text)
+	{
+		return (" " + text.replaceAll("<[^>]*>", " ").toLowerCase(java.util.Locale.ENGLISH).replaceAll("[^a-z]+", " ") + " ")
+			.replace(" knight ", " ").replace(" knights ", " ").replaceAll(" +", " ").trim();
+	}
 }

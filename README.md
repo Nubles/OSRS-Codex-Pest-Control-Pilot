@@ -29,11 +29,17 @@ Part of the **Codex** suite of RuneLite plugins. They share one look: warm ink, 
 
 **Damage for points.** A game only gives points once you have dealt 50 damage. The plaque and the panel count yours. If the client drops its connection mid-game and gets it back, the count carries on.
 
+**Alerts.** With the client in the background, a notification says when the game begins, so you can wait in the lander doing something else. You can also be told when a shield drops (with its gate and the portal due next) and when the Void Knight falls low.
+
+**A quiet lander.** When the lander has sat short of the five players a game needs for half a minute, the plaque and the Battle page say so, and that most players use world 344.
+
 **Void check.** Before a game, at the outpost or in the lander, the Battle page says what the void you wear does for the weapon in your hand. When it gives no set bonus (a piece missing, or a helm for another style), the plaque says so while there is still time to fix it.
 
 **Goal.** Pick the void melee, ranger or mage set, all three helms, elite void, or any pieces you like, the mace and seal too. The Pilot counts your points against what is left, skipping pieces you already own, and says how many games and how long that is. Points and minutes a game are measured from your own games, losses included, once three are in. Before your points are read in a lander, the games show as "?", not counted from zero.
 
 **What your points buy now.** The Goal page draws your void on the equipment screen, owned pieces ticked. Teal lights the pieces your points buy together, choosing the set that spends the most of them: 400 points toward a top and two helms light both helms, not the top with 150 left over. The **Buy order** lists the rest cheapest first, each with the games and time until you can buy it. Elite pieces wait at the end until the hard Western Provinces diary is done.
+
+**In the reward shop.** Your goal is outlined in the Void Knights' reward shop: teal round the pieces your points buy now, a gold line round the rest.
 
 **Void card.** *Copy void card* puts a picture on your clipboard to paste into a chat: your void as worn beside your points, the games left and when, your points a game and the pieces owned.
 
@@ -60,6 +66,8 @@ Part of the **Codex** suite of RuneLite plugins. They share one look: warm ink, 
 - **Mark the portal** and **Mark possible next portals** (both on): the outlines in the world and on the minimap.
 - **Defend knight below** (60): the knight's health at which defending him comes first; 0 turns it off.
 - **Void check on the plaque** (on): the warning when the void you wear gives no set bonus.
+- **Mark the reward shop** (on): your goal outlined in the reward shop.
+- **Alerts**: **Game start** (on), **Shield drop** and **Knight in danger** (off). Each uses RuneLite's own notification settings unless you change it.
 - **Game summary in chat** and **Affordable pieces in chat** (both on).
 - **Lander for estimates** (Best for my level): which lander the games left assume until your own games are measured.
 - **Name on cards** (on): turn off to share the void card without your character's name.

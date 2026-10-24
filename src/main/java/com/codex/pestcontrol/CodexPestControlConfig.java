@@ -4,6 +4,7 @@ import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
+import net.runelite.client.config.Notification;
 import net.runelite.client.config.Range;
 
 @ConfigGroup(CodexPestControlConfig.GROUP)
@@ -69,9 +70,16 @@ public interface CodexPestControlConfig extends Config
 	String chat = "chat";
 
 	@ConfigSection(
+		name = "Alerts",
+		description = "When Pest Control Pilot sends a notification, useful with the client in the background",
+		position = 2
+	)
+	String alerts = "alerts";
+
+	@ConfigSection(
 		name = "Goal and card",
 		description = "How the goal is counted and what the void card shows",
-		position = 2
+		position = 3
 	)
 	String goal = "goal";
 
@@ -182,5 +190,53 @@ public interface CodexPestControlConfig extends Config
 	default boolean nameOnCard()
 	{
 		return true;
+	}
+
+	@ConfigItem(
+		keyName = "markShop",
+		name = "Mark the reward shop",
+		description = "In the Void Knights' reward shop, outline the pieces of your goal, the ones your points buy now in teal",
+		position = 5,
+		section = inGame
+	)
+	default boolean markShop()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "notifyStart",
+		name = "Game start",
+		description = "Notify when a game begins, so you can wait in the lander with the client in the background",
+		position = 0,
+		section = alerts
+	)
+	default Notification notifyStart()
+	{
+		return Notification.ON;
+	}
+
+	@ConfigItem(
+		keyName = "notifyShield",
+		name = "Shield drop",
+		description = "Notify when a portal's shield drops, naming its gate and the portal due next",
+		position = 1,
+		section = alerts
+	)
+	default Notification notifyShield()
+	{
+		return Notification.OFF;
+	}
+
+	@ConfigItem(
+		keyName = "notifyKnight",
+		name = "Knight in danger",
+		description = "Notify once a game when the Void Knight's health falls to the Defend knight below setting",
+		position = 2,
+		section = alerts
+	)
+	default Notification notifyKnight()
+	{
+		return Notification.OFF;
 	}
 }
