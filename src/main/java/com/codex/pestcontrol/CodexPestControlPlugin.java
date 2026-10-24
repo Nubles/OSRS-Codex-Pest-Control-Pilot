@@ -596,7 +596,12 @@ public class CodexPestControlPlugin extends Plugin
 						battle.foundOpen(e.getKey());
 					}
 				}
-				notifier.notify(config.notifyStart(), alerts.start(battle).getMessage());
+				Alerts.Alert begun = alerts.start(battle);
+				// Only a game boarded from the lander is news: not one already on when the plugin started.
+				if (inLander)
+				{
+					notifier.notify(config.notifyStart(), begun.getMessage());
+				}
 				break;
 			case RESUME:
 				battle = ending != null ? ending : new Battle();
@@ -1298,7 +1303,19 @@ public class CodexPestControlPlugin extends Plugin
 			}
 			return locked ? "Points enough; the diary is due" : "Enough for all of it: visit the reward shop";
 		}
-		return Format.number(o.getRemaining()) + " to go, about " + Format.plural(o.getGames(), "game", "games");
+		String left = Format.number(o.getRemaining()) + " to go, about " + Format.plural(o.getGames(), "game", "games");
+		Set<Reward> locked = EnumSet.noneOf(Reward.class);
+		for (Reward r : o.getNeeded())
+		{
+			if (r.isElite() && !elite)
+			{
+				locked.add(r);
+			}
+		}
+		Set<Reward> buyable = o.buyableNow(locked);
+		// Part of the goal is already yours to buy: worth a trip to the shop before the next game.
+		return buyable.size() == 1 ? "buy the " + buyable.iterator().next().getShortTitle().toLowerCase(Locale.ENGLISH) + " now; " + left
+			: buyable.size() > 1 ? "buy " + buyable.size() + " pieces now; " + left : left;
 	}
 
 	private void showPlaque(View.State state, Advice advice, Battle b, Outlook o, Goal preset, VoidCheck voidCheck)

@@ -33,6 +33,8 @@ Part of the **Codex** suite of RuneLite plugins. They share one look: warm ink, 
 
 **A quiet lander.** When the lander has sat short of the five players a game needs for half a minute, the plaque and the Battle page say so, and that most players use world 344.
 
+**Before you board.** At the outpost the Battle page says what to do first. If your points already buy part of your goal, it sends you to the reward shop. Otherwise it gives the games to your next piece. It also names the lander that has paid you best. The outpost plaque does the same: "buy the top now; 288 to go".
+
 **Void check.** Before a game, at the outpost or in the lander, the Battle page says what the void you wear does for the weapon in your hand. When it gives no set bonus (a piece missing, or a helm for another style), the plaque says so while there is still time to fix it.
 
 **Goal.** Pick the void melee, ranger or mage set, all three helms, elite void, or any pieces you like, the mace and seal too. The Pilot counts your points against what is left, skipping pieces you already own, and says how many games and how long that is. Points and minutes a game are measured from your own games, losses included, once three are in. Before your points are read in a lander, the games show as "?", not counted from zero.

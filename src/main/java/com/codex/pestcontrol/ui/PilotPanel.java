@@ -298,7 +298,13 @@ public class PilotPanel extends PluginPanel
 			}
 			else if (view.state == View.State.OUTPOST)
 			{
-				stack.add(note("At the outpost", "Board a lander and the Pilot takes over once the game starts."));
+				String[] plan = beforeBoarding(view.outlook, locked(view.outlook), view.landers, view.combat);
+				Card card = note(plan[0], plan[1]);
+				if (plan[2] != null)
+				{
+					card.accent(Theme.TEAL);
+				}
+				stack.add(card);
 			}
 			else
 			{
@@ -743,6 +749,76 @@ public class PilotPanel extends PluginPanel
 		}
 		String last = names.remove(names.size() - 1);
 		return "You can already buy the " + String.join(", ", names) + " and " + last + ": together they spend the most of your points.";
+	}
+
+	/**
+	 * What to do before boarding: the reward shop first when the points already buy part of the
+	 * goal, otherwise the games to the next piece; then the lander that pays you best.
+	 *
+	 * @return the title, the text, and non-null in the third place when the points buy something now
+	 */
+	static String[] beforeBoarding(Outlook o, java.util.Set<Reward> locked, List<Landers.Line> landers, int combat)
+	{
+		String title;
+		String text;
+		String buy = null;
+		if (o == null || !o.isPointsKnown())
+		{
+			title = "At the outpost";
+			text = "Board a lander: your points are read there, and the Pilot takes over once the game starts.";
+		}
+		else if (o.isComplete())
+		{
+			title = "Your goal is complete";
+			text = "Every piece of it is yours. Choose more on the Goal page.";
+		}
+		else
+		{
+			java.util.Set<Reward> buyable = o.buyableNow(locked);
+			Outlook.Milestone next = null;
+			for (Outlook.Milestone m : o.milestones(locked))
+			{
+				if (m.getGames() > 0 && !(m.getReward().isElite() && locked.contains(m.getReward())))
+				{
+					next = m;
+					break;
+				}
+			}
+			if (!buyable.isEmpty())
+			{
+				buy = "buy";
+				title = "Visit the reward shop first";
+				text = canBuy(buyable);
+			}
+			else if (next != null)
+			{
+				String piece = next.getReward().getShortTitle().toLowerCase(Locale.ENGLISH);
+				title = Format.plural(next.getGames(), "game", "games") + " to the " + piece;
+				text = "About " + Format.span(next.getMinutes()) + " at your pace.";
+			}
+			else
+			{
+				title = "At the outpost";
+				text = "The rest of your goal waits on the hard Western Provinces diary.";
+			}
+		}
+		Landers.Line best = Landers.best(landers, combat);
+		if (best != null)
+		{
+			int trusted = 0;
+			for (Landers.Line l : landers)
+			{
+				trusted += l.isTrusted() ? 1 : 0;
+			}
+			text += " Your " + best.getBoat().getTitle().toLowerCase(Locale.ENGLISH) + " games " + (trusted > 1 ? "pay best: " : "earn ")
+				+ Math.round(best.pointsPerHour()) + " points an hour.";
+		}
+		else if (combat > 0)
+		{
+			com.codex.pestcontrol.core.Boat boat = com.codex.pestcontrol.core.Boat.forCombat(combat);
+			text += " Your level boards the " + boat.getTitle().toLowerCase(Locale.ENGLISH) + " lander, " + boat.getPoints() + " points a win.";
+		}
+		return new String[]{title, text, buy};
 	}
 
 	/** The elite pieces the goal still needs that the diary keeps locked. */

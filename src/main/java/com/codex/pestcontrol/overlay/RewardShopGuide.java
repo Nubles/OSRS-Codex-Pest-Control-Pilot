@@ -78,8 +78,7 @@ public class RewardShopGuide extends Overlay
 		{
 			return null;
 		}
-		Map<Reward, Rectangle> lines = new EnumMap<>(Reward.class);
-		find(options, lines, 0);
+		Map<Reward, Rectangle> lines = lines(options);
 		if (lines.isEmpty())
 		{
 			return null;
@@ -104,7 +103,14 @@ public class RewardShopGuide extends Overlay
 		return null;
 	}
 
-	/** Gathers the bounds of each reward's line, its words and its picture together. */
+	/** Each reward's line in the shop: its words and its picture together. */
+	static Map<Reward, Rectangle> lines(Widget options)
+	{
+		Map<Reward, Rectangle> lines = new EnumMap<>(Reward.class);
+		find(options, lines, 0);
+		return lines;
+	}
+
 	private static void find(Widget w, Map<Reward, Rectangle> lines, int depth)
 	{
 		if (w == null || w.isHidden() || depth > MAX_DEPTH)
