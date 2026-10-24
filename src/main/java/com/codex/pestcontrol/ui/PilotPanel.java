@@ -284,11 +284,27 @@ public class PilotPanel extends PluginPanel
 			map.setFight(null);
 			if (view.state == View.State.LANDER)
 			{
-				stack.add(note("Waiting in the lander", "When the game starts the Pilot charts the island and tells you which portal to work, marking it in the world and on the minimap."));
+				if (view.landerTip != null)
+				{
+					stack.add(note("A quiet lander", view.landerTip + ". The Pilot takes over once a game starts."));
+				}
+				else
+				{
+					int need = com.codex.pestcontrol.core.Boarding.MIN_PLAYERS;
+					String ready = view.ready < 0 ? "" : view.ready >= need ? view.ready + " aboard, enough for a game. "
+						: view.ready + " aboard; a game needs " + need + ". ";
+					stack.add(note("Waiting in the lander", ready + "When the game starts the Pilot charts the island and tells you which portal to work, marking it in the world and on the minimap."));
+				}
 			}
 			else if (view.state == View.State.OUTPOST)
 			{
-				stack.add(note("At the outpost", "Board a lander and the Pilot takes over once the game starts."));
+				String[] plan = beforeBoarding(view.outlook, locked(view.outlook), view.landers, view.combat);
+				Card card = note(plan[0], plan[1]);
+				if (plan[2] != null)
+				{
+					card.accent(Theme.TEAL);
+				}
+				stack.add(card);
 			}
 			else
 			{
@@ -317,7 +333,8 @@ public class PilotPanel extends PluginPanel
 
 		JPanel tiles = new JPanel(new GridLayout(1, 3, 6, 0));
 		tiles.setOpaque(false);
-		Color knight = f.knightHealth < 0 ? Theme.TEXT_MUTED : f.knightHealth <= 60 ? Theme.BLOOD : f.knightHealth <= 120 ? Theme.EMBER : Theme.GREEN;
+		int warn = view.knightWarn > 0 ? view.knightWarn : 60;
+		Color knight = f.knightHealth < 0 ? Theme.TEXT_MUTED : f.knightHealth <= warn ? Theme.BLOOD : f.knightHealth <= warn * 2 ? Theme.EMBER : Theme.GREEN;
 		tiles.add(new StatTile(f.knightHealth < 0 ? "-" : String.valueOf(f.knightHealth), "Knight", "health", knight));
 		boolean points = f.damage >= Battle.DAMAGE_FOR_POINTS;
 		tiles.add(new StatTile(String.valueOf(f.damage), "Damage", points ? "earned" : "of " + Battle.DAMAGE_FOR_POINTS, points ? Theme.GREEN : Theme.EMBER));
@@ -734,6 +751,76 @@ public class PilotPanel extends PluginPanel
 		return "You can already buy the " + String.join(", ", names) + " and " + last + ": together they spend the most of your points.";
 	}
 
+	/**
+	 * What to do before boarding: the reward shop first when the points already buy part of the
+	 * goal, otherwise the games to the next piece; then the lander that pays you best.
+	 *
+	 * @return the title, the text, and non-null in the third place when the points buy something now
+	 */
+	static String[] beforeBoarding(Outlook o, java.util.Set<Reward> locked, List<Landers.Line> landers, int combat)
+	{
+		String title;
+		String text;
+		String buy = null;
+		if (o == null || !o.isPointsKnown())
+		{
+			title = "At the outpost";
+			text = "Board a lander: your points are read there, and the Pilot takes over once the game starts.";
+		}
+		else if (o.isComplete())
+		{
+			title = "Your goal is complete";
+			text = "Every piece of it is yours. Choose more on the Goal page.";
+		}
+		else
+		{
+			java.util.Set<Reward> buyable = o.buyableNow(locked);
+			Outlook.Milestone next = null;
+			for (Outlook.Milestone m : o.milestones(locked))
+			{
+				if (m.getGames() > 0 && !(m.getReward().isElite() && locked.contains(m.getReward())))
+				{
+					next = m;
+					break;
+				}
+			}
+			if (!buyable.isEmpty())
+			{
+				buy = "buy";
+				title = "Visit the reward shop first";
+				text = canBuy(buyable);
+			}
+			else if (next != null)
+			{
+				String piece = next.getReward().getShortTitle().toLowerCase(Locale.ENGLISH);
+				title = Format.plural(next.getGames(), "game", "games") + " to the " + piece;
+				text = "About " + Format.span(next.getMinutes()) + " at your pace.";
+			}
+			else
+			{
+				title = "At the outpost";
+				text = "The rest of your goal waits on the hard Western Provinces diary.";
+			}
+		}
+		Landers.Line best = Landers.best(landers, combat);
+		if (best != null)
+		{
+			int trusted = 0;
+			for (Landers.Line l : landers)
+			{
+				trusted += l.isTrusted() ? 1 : 0;
+			}
+			text += " Your " + best.getBoat().getTitle().toLowerCase(Locale.ENGLISH) + " games " + (trusted > 1 ? "pay best: " : "earn ")
+				+ Math.round(best.pointsPerHour()) + " points an hour.";
+		}
+		else if (combat > 0)
+		{
+			com.codex.pestcontrol.core.Boat boat = com.codex.pestcontrol.core.Boat.forCombat(combat);
+			text += " Your level boards the " + boat.getTitle().toLowerCase(Locale.ENGLISH) + " lander, " + boat.getPoints() + " points a win.";
+		}
+		return new String[]{title, text, buy};
+	}
+
 	/** The elite pieces the goal still needs that the diary keeps locked. */
 	private java.util.Set<Reward> locked(Outlook o)
 	{
@@ -846,6 +933,7 @@ public class PilotPanel extends PluginPanel
 			return;
 		}
 		addSitting(stack, view.sitting);
+		addBests(stack, view.bests);
 		addDamage(stack, games);
 		addLanders(stack);
 
@@ -882,6 +970,24 @@ public class PilotPanel extends PluginPanel
 		tiles.add(new StatTile(Format.number(count), count == 1 ? "Game" : "Games", s.getWon() + " won", Theme.GOLD));
 		tiles.add(new StatTile(Format.number(s.getPoints()), "Points", s.getUnpaid() > 0 ? s.getUnpaid() + " unpaid" : "earned", Theme.GOLD_BRIGHT));
 		tiles.add(new StatTile(s.pointsPerHour() > 0 ? String.valueOf(s.pointsPerHour()) : "-", "Per hour", "waits in", Theme.TEAL));
+		stack.add(tiles);
+	}
+
+	/** Your best game for damage, your fastest win and your longest run of wins, each with its day. */
+	private void addBests(StackPanel stack, com.codex.pestcontrol.core.Bests b)
+	{
+		if (b == null || b.isEmpty())
+		{
+			return;
+		}
+		stack.add(new SectionHeader("Your bests", b.getStreak() > 1 ? b.getStreak() + " wins running" : null));
+		JPanel tiles = new JPanel(new GridLayout(1, 3, 6, 0));
+		tiles.setOpaque(false);
+		tiles.add(new StatTile(Format.number(b.getDamage()), "Damage", Format.shortDay(b.getDamageAt()), Theme.EMBER));
+		tiles.add(new StatTile(b.getFastest() > 0 ? Format.clock(b.getFastest()).replace(" ", "") : "-", "Fastest",
+			b.getFastest() > 0 ? Format.shortDay(b.getFastestAt()) : "no win yet", Theme.GOLD_BRIGHT));
+		tiles.add(new StatTile(Format.number(b.getBestStreak()), "Best run", b.getBestStreak() > 0 ? Format.shortDay(b.getBestStreakAt()) : "-",
+			Theme.GREEN));
 		stack.add(tiles);
 	}
 

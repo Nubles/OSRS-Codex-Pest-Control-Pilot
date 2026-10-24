@@ -137,6 +137,15 @@ public final class View
 	/** The levels Codex Navigator's pinned goals need in those skills; empty without Navigator. */
 	public List<com.codex.pestcontrol.core.NavigatorGoals.Need> goals = Collections.emptyList();
 
+	/** Your best games; null before any. */
+	public com.codex.pestcontrol.core.Bests bests;
+	/** The knight's health at which defending him comes first, as set. */
+	public int knightWarn = 60;
+	/** Players ready in the lander you sit in, or -1 when not aboard or not read. */
+	public int ready = -1;
+	/** What to say when the lander is filling too slowly for a game, or null. */
+	public String landerTip;
+
 	/** Whether the void card names the player; off to share it without the name. */
 	public boolean nameOnCard = true;
 

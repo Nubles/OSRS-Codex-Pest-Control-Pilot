@@ -39,6 +39,7 @@ public class Logbook
 	private int earned;
 	private long seconds;
 	private ShieldClock clock;
+	private Bests bests;
 
 	public Logbook()
 	{
@@ -46,6 +47,7 @@ public class Logbook
 		owned = new ArrayList<>();
 		games = new ArrayList<>();
 		clock = new ShieldClock();
+		bests = new Bests();
 	}
 
 	/** How long shields take to drop, learned from your games. */
@@ -96,6 +98,8 @@ public class Logbook
 			clock = new ShieldClock();
 		}
 		clock.repair();
+		// A save from before bests were kept starts from the games it holds.
+		bests = bests == null || bests.isEmpty() ? Bests.of(games) : bests.repair(games);
 		// The knights hold at most the cap; below zero is "not read yet".
 		points = points < 0 ? -1 : Math.min(points, POINTS_CAP);
 		pointsSeen = Math.max(0, pointsSeen);
@@ -171,8 +175,29 @@ public class Logbook
 		return ownedSeen;
 	}
 
-	public void record(GameRecord game)
+	/** Your best games; see {@link Bests}. */
+	public Bests getBests()
 	{
+		if (bests == null)
+		{
+			bests = Bests.of(games);
+		}
+		return bests;
+	}
+
+	/** @return the bests the game beat */
+	public Set<Bests.Kind> record(GameRecord game)
+	{
+		return record(game, true);
+	}
+
+	/**
+	 * @param whole whether the game was seen from its start
+	 * @return the bests the game beat
+	 */
+	public Set<Bests.Kind> record(GameRecord game, boolean whole)
+	{
+		Set<Bests.Kind> beat = getBests().add(game, whole);
 		games.add(game);
 		while (games.size() > KEEP)
 		{
@@ -180,7 +205,7 @@ public class Logbook
 		}
 		if (game.getResult() == GameRecord.Result.LEFT)
 		{
-			return;
+			return beat;
 		}
 		played++;
 		if (game.getResult() != GameRecord.Result.LOST)
@@ -189,6 +214,7 @@ public class Logbook
 		}
 		earned += game.getPoints();
 		seconds += game.getSeconds();
+		return beat;
 	}
 
 	public List<GameRecord> getGames()
