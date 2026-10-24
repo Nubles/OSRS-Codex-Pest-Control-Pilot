@@ -26,4 +26,13 @@ public class PlaqueGoalTest
 		Outlook shy = Outlook.of(EnumSet.of(Reward.TOP), EnumSet.noneOf(Reward.class), 240, 5, 3, false);
 		assertEquals("10 to go, about 2 games", CodexPestControlPlugin.goalDetail(shy, false));
 	}
+
+	@Test
+	public void pointsThatAlreadyBuyAPieceSaySoFirst()
+	{
+		Outlook part = Outlook.of(EnumSet.of(Reward.TOP, Reward.ROBE, Reward.MELEE_HELM), EnumSet.noneOf(Reward.class), 412, 5, 3, false);
+		assertEquals("buy the top now; 288 to go, about 58 games", CodexPestControlPlugin.goalDetail(part, false));
+		Outlook two = Outlook.of(EnumSet.of(Reward.MELEE_HELM, Reward.MAGE_HELM, Reward.TOP), EnumSet.noneOf(Reward.class), 400, 5, 3, false);
+		assertEquals("buy 2 pieces now; 250 to go, about 50 games", CodexPestControlPlugin.goalDetail(two, false));
+	}
 }

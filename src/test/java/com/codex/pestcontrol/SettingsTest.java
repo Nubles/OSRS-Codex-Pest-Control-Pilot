@@ -114,7 +114,7 @@ public class SettingsTest
 				keys.add(item.keyName());
 			}
 		}
-		for (String key : new String[]{"announce", "gameSummary", "knightWarn", "lander", "markCandidates", "markPortal", "nameOnCard", "plaque", "voidCheck"})
+		for (String key : new String[]{"announce", "gameSummary", "knightWarn", "lander", "markCandidates", "markPortal", "markShop", "nameOnCard", "notifyKnight", "notifyShield", "notifyStart", "plaque", "voidCheck"})
 		{
 			assertTrue(key, keys.contains(key));
 		}
