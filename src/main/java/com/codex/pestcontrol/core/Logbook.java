@@ -99,7 +99,7 @@ public class Logbook
 		}
 		clock.repair();
 		// A save from before bests were kept starts from the games it holds.
-		bests = bests == null || bests.isEmpty() ? Bests.of(games) : bests.repair();
+		bests = bests == null || bests.isEmpty() ? Bests.of(games) : bests.repair(games);
 		// The knights hold at most the cap; below zero is "not read yet".
 		points = points < 0 ? -1 : Math.min(points, POINTS_CAP);
 		pointsSeen = Math.max(0, pointsSeen);
@@ -188,7 +188,16 @@ public class Logbook
 	/** @return the bests the game beat */
 	public Set<Bests.Kind> record(GameRecord game)
 	{
-		Set<Bests.Kind> beat = getBests().add(game);
+		return record(game, true);
+	}
+
+	/**
+	 * @param whole whether the game was seen from its start
+	 * @return the bests the game beat
+	 */
+	public Set<Bests.Kind> record(GameRecord game, boolean whole)
+	{
+		Set<Bests.Kind> beat = getBests().add(game, whole);
 		games.add(game);
 		while (games.size() > KEEP)
 		{

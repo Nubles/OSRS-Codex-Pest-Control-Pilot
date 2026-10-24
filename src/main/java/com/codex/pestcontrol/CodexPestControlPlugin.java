@@ -230,6 +230,10 @@ public class CodexPestControlPlugin extends Plugin
 	private final GameWatch watch = new GameWatch();
 	private final Alerts alerts = new Alerts();
 	private final Boarding boarding = new Boarding();
+	/** Ticks since the lander's overlay was last seen, capped just past the grace. */
+	private int ticksSinceLander = LANDER_GRACE_TICKS + 1;
+	/** A game whose bar shows within this many ticks of leaving the lander was boarded from it. */
+	private static final int LANDER_GRACE_TICKS = 5;
 	/**
 	 * The connection dropped and the scene is being sent again: a portal that spawns open may have
 	 * dropped its shield while the connection was gone, so when is not known. Until the first tick back.
@@ -597,16 +601,26 @@ public class CodexPestControlPlugin extends Plugin
 					}
 				}
 				Alerts.Alert begun = alerts.start(battle);
-				// Only a game boarded from the lander is news: not one already on when the plugin started.
-				if (inLander)
+				// Only a game boarded from the lander is news, not one already on when the plugin started.
+				// The lander's overlay can close a tick or two before the game's bar shows.
+				battle.setWhole(ticksSinceLander <= LANDER_GRACE_TICKS);
+				if (battle.isWhole())
 				{
 					notifier.notify(config.notifyStart(), begun.getMessage());
 				}
 				break;
 			case RESUME:
-				battle = ending != null ? ending : new Battle();
+				if (ending != null)
+				{
+					battle = ending;
+					alerts.resume(battle);
+				}
+				else
+				{
+					battle = new Battle();
+					alerts.start(battle);
+				}
 				ending = null;
-				alerts.resume(battle);
 				break;
 			case SETTLE:
 				ending = battle;
@@ -681,6 +695,7 @@ public class CodexPestControlPlugin extends Plugin
 		{
 			boarding.leave();
 		}
+		ticksSinceLander = lander ? 0 : Math.min(ticksSinceLander + 1, LANDER_GRACE_TICKS + 1);
 		if (lander != inLander)
 		{
 			inLander = lander;
@@ -746,7 +761,7 @@ public class CodexPestControlPlugin extends Plugin
 		Outlook before = outlook();
 		long now = System.currentTimeMillis();
 		GameRecord game = new GameRecord(now, boat, outcome, earned, b.getDamage(), (int) Math.round(b.getTicks() * 0.6));
-		Set<Bests.Kind> beat = logbook.record(game);
+		Set<Bests.Kind> beat = logbook.record(game, b.isWhole());
 		if (r.total >= 0)
 		{
 			logbook.seePoints(r.total, now);

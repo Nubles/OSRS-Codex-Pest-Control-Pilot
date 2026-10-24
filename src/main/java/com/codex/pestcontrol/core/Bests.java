@@ -48,6 +48,16 @@ public final class Bests
 	/** @return what the game beat, empty early on when every game is a best */
 	public Set<Kind> add(GameRecord g)
 	{
+		return add(g, true);
+	}
+
+	/**
+	 * @param whole whether the game was seen from its start; one picked up part way through ran
+	 *              longer than its count says, so it cannot be the fastest win
+	 * @return what the game beat, empty early on when every game is a best
+	 */
+	public Set<Kind> add(GameRecord g, boolean whole)
+	{
 		Set<Kind> beat = EnumSet.noneOf(Kind.class);
 		if (g == null || g.getResult() == GameRecord.Result.LEFT)
 		{
@@ -70,7 +80,7 @@ public final class Bests
 			runTold = false;
 			return beat;
 		}
-		if (g.getResult() == GameRecord.Result.WON && g.getSeconds() >= SHORTEST_WIN && (fastest == 0 || g.getSeconds() < fastest))
+		if (whole && g.getResult() == GameRecord.Result.WON && g.getSeconds() >= SHORTEST_WIN && (fastest == 0 || g.getSeconds() < fastest))
 		{
 			if (news && fastest > 0)
 			{
@@ -108,6 +118,29 @@ public final class Bests
 		c.counted = counted;
 		c.runTold = runTold;
 		return c;
+	}
+
+	/** Brings back figures out of range, and any a damaged save lost, from the games kept. */
+	Bests repair(List<GameRecord> games)
+	{
+		Bests from = of(games);
+		if (damage <= 0 && from.damage > 0)
+		{
+			damage = from.damage;
+			damageAt = from.damageAt;
+		}
+		if (fastest <= 0 && from.fastest > 0)
+		{
+			fastest = from.fastest;
+			fastestAt = from.fastestAt;
+		}
+		if (bestStreak < from.bestStreak)
+		{
+			bestStreak = from.bestStreak;
+			bestStreakAt = from.bestStreakAt;
+		}
+		counted = Math.max(counted, from.counted);
+		return repair();
 	}
 
 	Bests repair()

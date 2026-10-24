@@ -45,6 +45,19 @@ public class Battle
 	/** The portal last sent to once points were earned, held unless another clearly holds the game up more. */
 	private Portal holding;
 
+	/** Whether the game was boarded from the lander, so seen from its start. */
+	private boolean whole;
+
+	public boolean isWhole()
+	{
+		return whole;
+	}
+
+	public void setWhole(boolean whole)
+	{
+		this.whole = whole;
+	}
+
 	public Battle()
 	{
 		for (int i = 0; i < 4; i++)

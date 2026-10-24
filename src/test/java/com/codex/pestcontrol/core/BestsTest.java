@@ -88,4 +88,28 @@ public class BestsTest
 		assertEquals(b.getDamage(), again.getBests().getDamage());
 		assertEquals(b.getFastest(), again.getBests().getFastest());
 	}
+
+	@Test
+	public void aGamePickedUpPartWayIsNeverTheFastestWin()
+	{
+		Bests b = new Bests();
+		b.add(game(GameRecord.Result.WON, 80, 200, 1));
+		b.add(game(GameRecord.Result.WON, 80, 90, 2), false);
+		assertEquals(200, b.getFastest());
+		assertEquals(2, b.getBestStreak());
+	}
+
+	@Test
+	public void bestsADamagedSaveLostComeBackFromTheGames()
+	{
+		Gson gson = new Gson();
+		Logbook old = DamagedDataTest.good(30);
+		int damage = old.getBests().getDamage();
+		int fastest = old.getBests().getFastest();
+		String json = gson.toJson(old).replaceAll("\"damage\":[0-9]+,\"damageAt\"", "\"damage\":\"x\",\"damageAt\"")
+			.replaceAll("\"fastest\":[0-9]+", "\"fastest\":-4");
+		Bests read = Logbook.read(gson, json).getBests();
+		assertEquals(damage, read.getDamage());
+		assertEquals(fastest, read.getFastest());
+	}
 }
