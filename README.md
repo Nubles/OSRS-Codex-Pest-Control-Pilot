@@ -49,6 +49,8 @@ Part of the **Codex** suite of RuneLite plugins. They share one look: warm ink, 
 
 **Record.** Games played and won, points earned and an hour, your damage in each recent game against the 50 it needs, the sitting in hand, and each lander rated from your own games. When another lander you can board pays clearly better, the Goal page says so.
 
+**Your bests.** The Record page keeps your most damage in a game, your fastest win and your longest run of wins, each with its day, and outlives the recent games list. When a game beats one, the summary in chat says so.
+
 **Spare points.** Once your goal is covered, the Goal page shows what the points over it buy as combat experience at the reward shop, spent 100 at a time for the 10% bonus.
 
 **Chat.** After each game, a line with its points and damage, the points still to your goal and the sitting so far. A line says when your points first buy a piece, and a warning comes within 50 points of the 4,000 the knights will hold.

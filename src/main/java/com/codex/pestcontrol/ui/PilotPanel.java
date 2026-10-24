@@ -327,7 +327,8 @@ public class PilotPanel extends PluginPanel
 
 		JPanel tiles = new JPanel(new GridLayout(1, 3, 6, 0));
 		tiles.setOpaque(false);
-		Color knight = f.knightHealth < 0 ? Theme.TEXT_MUTED : f.knightHealth <= 60 ? Theme.BLOOD : f.knightHealth <= 120 ? Theme.EMBER : Theme.GREEN;
+		int warn = view.knightWarn > 0 ? view.knightWarn : 60;
+		Color knight = f.knightHealth < 0 ? Theme.TEXT_MUTED : f.knightHealth <= warn ? Theme.BLOOD : f.knightHealth <= warn * 2 ? Theme.EMBER : Theme.GREEN;
 		tiles.add(new StatTile(f.knightHealth < 0 ? "-" : String.valueOf(f.knightHealth), "Knight", "health", knight));
 		boolean points = f.damage >= Battle.DAMAGE_FOR_POINTS;
 		tiles.add(new StatTile(String.valueOf(f.damage), "Damage", points ? "earned" : "of " + Battle.DAMAGE_FOR_POINTS, points ? Theme.GREEN : Theme.EMBER));
@@ -856,6 +857,7 @@ public class PilotPanel extends PluginPanel
 			return;
 		}
 		addSitting(stack, view.sitting);
+		addBests(stack, view.bests);
 		addDamage(stack, games);
 		addLanders(stack);
 
@@ -892,6 +894,24 @@ public class PilotPanel extends PluginPanel
 		tiles.add(new StatTile(Format.number(count), count == 1 ? "Game" : "Games", s.getWon() + " won", Theme.GOLD));
 		tiles.add(new StatTile(Format.number(s.getPoints()), "Points", s.getUnpaid() > 0 ? s.getUnpaid() + " unpaid" : "earned", Theme.GOLD_BRIGHT));
 		tiles.add(new StatTile(s.pointsPerHour() > 0 ? String.valueOf(s.pointsPerHour()) : "-", "Per hour", "waits in", Theme.TEAL));
+		stack.add(tiles);
+	}
+
+	/** Your best game for damage, your fastest win and your longest run of wins, each with its day. */
+	private void addBests(StackPanel stack, com.codex.pestcontrol.core.Bests b)
+	{
+		if (b == null || b.isEmpty())
+		{
+			return;
+		}
+		stack.add(new SectionHeader("Your bests", b.getStreak() > 1 ? b.getStreak() + " wins running" : null));
+		JPanel tiles = new JPanel(new GridLayout(1, 3, 6, 0));
+		tiles.setOpaque(false);
+		tiles.add(new StatTile(Format.number(b.getDamage()), "Damage", Format.shortDay(b.getDamageAt()), Theme.EMBER));
+		tiles.add(new StatTile(b.getFastest() > 0 ? Format.clock(b.getFastest()).replace(" ", "") : "-", "Fastest",
+			b.getFastest() > 0 ? Format.shortDay(b.getFastestAt()) : "no win yet", Theme.GOLD_BRIGHT));
+		tiles.add(new StatTile(Format.number(b.getBestStreak()), "Best run", b.getBestStreak() > 0 ? Format.shortDay(b.getBestStreakAt()) : "-",
+			Theme.GREEN));
 		stack.add(tiles);
 	}
 

@@ -3,6 +3,7 @@ package com.codex.pestcontrol;
 import com.codex.pestcontrol.core.Advice;
 import com.codex.pestcontrol.core.Alerts;
 import com.codex.pestcontrol.core.Battle;
+import com.codex.pestcontrol.core.Bests;
 import com.codex.pestcontrol.core.Boarding;
 import com.codex.pestcontrol.core.Boat;
 import com.codex.pestcontrol.core.Experience;
@@ -740,7 +741,7 @@ public class CodexPestControlPlugin extends Plugin
 		Outlook before = outlook();
 		long now = System.currentTimeMillis();
 		GameRecord game = new GameRecord(now, boat, outcome, earned, b.getDamage(), (int) Math.round(b.getTicks() * 0.6));
-		logbook.record(game);
+		Set<Bests.Kind> beat = logbook.record(game);
 		if (r.total >= 0)
 		{
 			logbook.seePoints(r.total, now);
@@ -752,7 +753,7 @@ public class CodexPestControlPlugin extends Plugin
 		unsaved = true;
 		dirty = true;
 		Outlook after = outlook();
-		summarise(game, after);
+		summarise(game, after, beat);
 		announce(before, after);
 	}
 
@@ -769,13 +770,15 @@ public class CodexPestControlPlugin extends Plugin
 	}
 
 	/** A line in the chat box after a game; see {@link GameSummary}. */
-	private void summarise(GameRecord game, Outlook after)
+	private void summarise(GameRecord game, Outlook after, Set<Bests.Kind> beat)
 	{
 		String text = config.gameSummary() ? GameSummary.of(game, after, Sitting.latest(logbook.getGames(), game.getEnded())) : null;
-		if (text == null)
+		String best = config.gameSummary() ? logbook.getBests().news(beat) : null;
+		if (text == null && best == null)
 		{
 			return;
 		}
+		text = best == null ? text : text == null ? best + "." : text + " " + best + ".";
 		chatMessageManager.queue(QueuedMessage.builder()
 			.type(ChatMessageType.CONSOLE)
 			.runeLiteFormattedMessage(new ChatMessageBuilder()
@@ -1268,6 +1271,8 @@ public class CodexPestControlPlugin extends Plugin
 		view.goals = navigatorNeeds(view.levels);
 		view.voidCheck = battle == null && me != null ? VoidCheck.of(worn, style(), owned()) : null;
 		view.nameOnCard = config.nameOnCard();
+		view.bests = logbook.getBests().copy();
+		view.knightWarn = config.knightWarn();
 		view.ready = state == View.State.LANDER ? boarding.getReady() : -1;
 		view.landerTip = state == View.State.LANDER && boarding.isQuiet(client.getWorld()) ? boarding.tip() : null;
 		return view;
