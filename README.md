@@ -94,6 +94,10 @@ Everything is kept per account in your RuneLite profile. A save damaged on disk 
 
 Codex Pest Control Pilot only reads what the game already shows you: the portals, the knight, the status bar, your hitsplats, your gear, pack and bank, and the chat messages the game sends. It outlines objects and draws its own panel and plaque. It does not click, move, attack, change menus, or send anything over the network; you do every click.
 
+## Field notes
+
+An optional setting, **Keep field notes** (under Field notes, off by default), writes a plain record of what Pest Control Pilot reads and decides to its own folder in `.runelite/plugin-data` on your computer, one line at a time. It is for checking the plugin's guesses against real play: when something looks wrong, the notes show what it saw and why it chose what it did. Other players' chat is never written down, it stays on your computer, and nothing is sent anywhere.
+
 ## Development
 
 ```bash
