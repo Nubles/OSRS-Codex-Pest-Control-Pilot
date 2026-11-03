@@ -7,7 +7,7 @@ public class GameRecord
 	{
 		WON,
 		LOST,
-		/** Won, but too little damage was dealt to be given points. */
+		/** Won, but no points: the activity bar ran out during the game. */
 		NO_POINTS,
 		/** Left or logged out before the end. */
 		LEFT

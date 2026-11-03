@@ -67,10 +67,10 @@ public class TeamPaceTest
 	}
 
 	@Test
-	public void beforePointsTheWeakestStillComesFirst()
+	public void whileActivityIsLowTheWeakestStillComesFirst()
 	{
 		Battle b = twoOpen(100, 5, 220, 0, 12);
-		assertEquals(Portal.PURPLE, b.advise(null).getPortal());
+		assertEquals(Portal.PURPLE, b.advise(new Field().activity(10)).getPortal());
 	}
 
 	@Test

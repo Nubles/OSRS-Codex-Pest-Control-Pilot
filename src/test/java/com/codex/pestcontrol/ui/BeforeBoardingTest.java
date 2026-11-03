@@ -34,7 +34,7 @@ public class BeforeBoardingTest
 		assertEquals("Visit the reward shop first", plan[0]);
 		assertNotNull(plan[2]);
 		assertTrue(plan[1], plan[1].startsWith("You can already buy the top."));
-		assertTrue(plan[1], plan[1].endsWith("Your level boards the veteran lander, 5 points a win."));
+		assertTrue(plan[1], plan[1].endsWith("Your level boards the veteran lander, 5 points a win, up to 8 with Combat Achievement tiers."));
 	}
 
 	@Test

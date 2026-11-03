@@ -12,11 +12,9 @@ import java.util.List;
  */
 public class Battle
 {
-	/** Damage a player has to deal in a game to be given points for it. */
-	public static final int DAMAGE_FOR_POINTS = 50;
 	/** A portal this many tiles nearer than the weakest open one is worth going to first. */
 	private static final int NEARER_BY = 15;
-	/** Until you have your points, an open portal with this many fewer players is worth going to. */
+	/** While your activity bar is low, an open portal with this many fewer players is worth going to. */
 	private static final int QUIETER_BY = 6;
 	/** Below this activity, waiting time is better spent on a barricade. */
 	private static final int LOW_ACTIVITY = 30;
@@ -37,12 +35,15 @@ public class Battle
 	private List<Rotation> possible = new ArrayList<>(Arrays.asList(Rotation.values()));
 	private int knightHealth = -1;
 	private int damage;
+	/** Whether the activity bar has been seen above 0%, and whether it has since run out. */
+	private boolean activitySeen;
+	private boolean activityEmptied;
 	private int ticks;
 	/** Each portal's health readings over the pace window: {tick, health}, oldest first. */
 	private final List<List<int[]>> readings = new ArrayList<>();
 	/** Your own hits on each portal over the pace window: {tick, damage}. */
 	private final List<List<int[]>> ownHits = new ArrayList<>();
-	/** The portal last sent to once points were earned, held unless another clearly holds the game up more. */
+	/** The portal last sent to while your activity bar was up, held unless another clearly holds the game up more. */
 	private Portal holding;
 
 	/** Whether the game was boarded from the lander, so seen from its start. */
@@ -350,15 +351,40 @@ public class Battle
 		return order;
 	}
 
+	/**
+	 * Whether a win still gives you points. The game used to ask for 50 damage; now it asks only that
+	 * your activity bar never runs out (OSRS Wiki, Pest Control: "The activity bar must stay above 0%
+	 * to remain eligible for rewards").
+	 */
 	public boolean hasPoints()
 	{
-		return damage >= DAMAGE_FOR_POINTS;
+		return !activityEmptied;
+	}
+
+	/** Notes a reading of your activity bar, 0 to 100, or -1 when it cannot be read. */
+	public void noteActivity(int percent)
+	{
+		if (percent > 0)
+		{
+			activitySeen = true;
+		}
+		else if (percent == 0 && activitySeen)
+		{
+			activityEmptied = true;
+		}
+	}
+
+	/** Whether the activity bar is read and low enough that easy damage matters more than speed. */
+	private static boolean lowActivity(Field f)
+	{
+		return f.activity >= 0 && f.activity < LOW_ACTIVITY;
 	}
 
 	/** What to do now, from the status bar and what can be seen around the island. */
 	public Advice advise(Field field)
 	{
 		Field f = field == null ? new Field() : field;
+		noteActivity(f.activity);
 		boolean knightLow = knightHealth >= 0 && f.knightWarn > 0 && knightHealth <= f.knightWarn;
 
 		List<Portal> open = new ArrayList<>();
@@ -384,7 +410,7 @@ public class Battle
 			Portal weakest = weakest(open);
 			Portal target = pick(open, weakest, f);
 			boolean quieter = target != weakest && quieter(target, weakest, f);
-			Portal slowest = hasPoints() ? holdingUp(open, target) : null;
+			Portal slowest = lowActivity(f) ? null : holdingUp(open, target);
 			holding = slowest;
 			if (slowest != null)
 			{
@@ -431,7 +457,7 @@ public class Battle
 	}
 
 	/**
-	 * Once your points are earned the game ends when the last portal falls, so the open portal
+	 * Once your activity bar is safely up the game ends when the last portal falls, so the open portal
 	 * the team is wearing down slowest is where your hits shorten it most. Returns it when it falls
 	 * clearly later than the portal otherwise picked, else null. The last pick is held while it is
 	 * still close to the slowest, so the advice does not flicker between two portals.
@@ -500,7 +526,7 @@ public class Battle
 		{
 			return lead + ". Kill the " + (spinning == 1 ? "spinner" : spinning + " spinners") + " healing it first";
 		}
-		return lead + ". Your points are earned, so your hits end the game sooner here";
+		return lead + ". Your activity bar is up, so your hits end the game sooner here";
 	}
 
 	/** What to say about the portal to attack: what stands in the way first, then why this one. */
@@ -524,7 +550,7 @@ public class Battle
 		Integer crowd = f.crowdAt(target);
 		if (quieter && crowd != null)
 		{
-			return crowd == 0 ? "Nobody is there yet: easy damage for your points" : "Only " + players(crowd) + " there: easier damage for your points";
+			return crowd == 0 ? "Nobody is there yet: easy damage to fill your activity bar" : "Only " + players(crowd) + " there: easier damage to fill your activity bar";
 		}
 		StringBuilder sb = new StringBuilder("Shield down");
 		if (health[target.ordinal()] > 0)
@@ -556,12 +582,12 @@ public class Battle
 	}
 
 	/**
-	 * The weakest open portal, unless you still need damage for points and another has far
+	 * The weakest open portal, unless your activity bar is low and another has far
 	 * fewer players to share it with, or another is a good deal nearer.
 	 */
 	private Portal pick(List<Portal> open, Portal weakest, Field f)
 	{
-		if (!hasPoints())
+		if (lowActivity(f))
 		{
 			Portal quietest = weakest;
 			for (Portal p : open)

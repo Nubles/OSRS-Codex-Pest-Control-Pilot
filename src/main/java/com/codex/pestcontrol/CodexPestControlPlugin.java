@@ -743,11 +743,8 @@ public class CodexPestControlPlugin extends Plugin
 			outcome = GameRecord.Result.LEFT;
 		}
 		int earned = Math.max(0, r.earned);
-		Boat boat = Boat.forPoints(earned);
-		if (boat == null)
-		{
-			boat = landerBoat;
-		}
+		// Combat Achievement tiers add points to a win, so the points alone can name the wrong lander.
+		Boat boat = landerBoat != null ? landerBoat : Boat.forPoints(earned);
 		if (outcome == GameRecord.Result.WON && earned == 0 && boat != null)
 		{
 			// The points message was missed; a won game gives the lander's points.
@@ -1352,12 +1349,12 @@ public class CodexPestControlPlugin extends Plugin
 			Color footColor;
 			if (b.hasPoints())
 			{
-				foot = b.getDamage() + " damage: points earned";
+				foot = b.getDamage() + " damage. Keep your activity bar up for points";
 				footColor = Theme.GREEN;
 			}
 			else
 			{
-				foot = b.getDamage() + " of " + Battle.DAMAGE_FOR_POINTS + " damage for points";
+				foot = "Your activity bar ran out: no points this game";
 				footColor = Theme.EMBER;
 			}
 			plaque.show(new PilotPlaque.Shown(kicker, advice.getHeadline(), colour, advice.getDetail(), foot, footColor));

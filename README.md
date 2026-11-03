@@ -18,7 +18,7 @@ Part of the **Codex** suite of RuneLite plugins. They share one look: warm ink, 
 
 **The island, charted.** The Battle page draws the outpost with its gates and the four portals. Open portals glow, shielded ones sit behind a ring, fallen ones go grey, each with its health and its place in the shield order. The one to work wears a gold halo, with the way there traced from the knight.
 
-**Reading the game.** Shields always drop in one of six orders, so after the first drop or two the Pilot knows the rest and sends you ahead of the crowd. It counts the players at each portal, and until you have your points it sends you where your hits are not shared out among a crowd. Once your 50 damage is in, the game ends only when the last portal falls, so it sends you to the portal falling slowest. It learns how long each shield takes from your own games and counts down to the next.
+**Reading the game.** Shields always drop in one of six orders, so after the first drop or two the Pilot knows the rest and sends you ahead of the crowd. It counts the players at each portal, and while your activity bar is low it sends you where your hits are not shared out among a crowd. Once the bar is up, the game ends only when the last portal falls, so it sends you to the portal falling slowest. It learns how long each shield takes from your own games and counts down to the next.
 
 <p align="center">
   <img src="docs/screenshots/battle-slowest.png" width="225" alt="The portal holding the game up">
@@ -27,7 +27,7 @@ Part of the **Codex** suite of RuneLite plugins. They share one look: warm ink, 
 
 **Marked in the world.** The portal to work gets an outline in its colour, a ring on its tile, a word over it and a ring on the minimap. While the next drop is still open, every portal it could be is faintly outlined.
 
-**Damage for points.** A game only gives points once you have dealt 50 damage. The plaque and the panel count yours. If the client drops its connection mid-game and gets it back, the count carries on.
+**Activity for points.** A won game gives points as long as your activity bar never runs out (there is no longer a 50 damage rule). The panel warns when the bar is low, and the plaque and the panel count your damage. If the client drops its connection mid-game and gets it back, the count carries on.
 
 **Alerts.** With the client in the background, a notification says when the game begins, so you can wait in the lander doing something else. You can also be told when a shield drops (with its gate and the portal due next) and when the Void Knight falls low.
 
