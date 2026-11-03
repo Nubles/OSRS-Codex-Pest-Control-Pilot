@@ -1,0 +1,49 @@
+# A game from the first tick: every shield up, then one drops and the plaque sends you to it.
+include /replays/scenes/outpost.scene
+widget PestLanderOverlay.PEST_LANDER_OVER_LEVEL text "Novice"
+widget PestLanderOverlay.PEST_LANDER_OVER_POINTS text "Commendation points: 120"
+tick 2
+
+# Off the lander and onto the island: the game's status bar shows and the portals spawn shielded.
+close PestLanderOverlay.PEST_LANDER_OVER_POINTS
+close PestLanderOverlay.PEST_LANDER_OVER_LEVEL
+npc PEST_PORTAL_SHIELD_1_ACTIVE "Portal" 2620 2650 3 as purple
+npc PEST_PORTAL_SHIELD_2_ACTIVE "Portal" 2680 2650 3 as blue
+npc PEST_PORTAL_SHIELD_3_ACTIVE "Portal" 2670 2620 3 as yellow
+npc PEST_PORTAL_SHIELD_4_ACTIVE "Portal" 2630 2620 3 as red
+widget PestStatusOverlay.PEST_STATUS_PORT1
+widget PestStatusOverlay.PEST_STATUS_PORTTXT1 text "250"
+widget PestStatusOverlay.PEST_STATUS_PORTTXT2 text "250"
+widget PestStatusOverlay.PEST_STATUS_PORTTXT3 text "250"
+widget PestStatusOverlay.PEST_STATUS_PORTTXT4 text "250"
+widget PestStatusOverlay.PEST_STATUS_OVER_HEALTH text "200"
+tick
+never kicker = "PEST CONTROL"
+expect kicker = WAIT
+expect headline = "Hold by the knight"
+# Red never drops first (the six rotations, oldschool.runescape.wiki/w/Pest_Control/Strategies).
+expect detail = "Purple, Blue or Yellow drops next"
+
+# Purple's shield drops, 15 seconds in.
+tick 24
+transform purple PEST_PORTAL_1_ACTIVE
+tick
+expect kicker = "WORK NEXT"
+expect headline = "Attack Purple (west)"
+expect detail = "Shield down, 250 health left"
+widget PestStatusOverlay.PEST_STATUS_PORTTXT1 text "120"
+tick
+expect detail = "Shield down, 120 health left"
+
+# Purple falls. After purple only rotations 3 and 4 are left: blue or yellow drops next.
+widget PestStatusOverlay.PEST_STATUS_PORTTXT1 text "0"
+remove purple
+tick
+never headline ~ Purple
+expect detail = "Blue or Yellow drops next"
+
+# Blue drops second: rotation 3, so the plaque sends you east.
+tick 49
+transform blue PEST_PORTAL_2_ACTIVE
+tick
+expect headline = "Attack Blue (east)"

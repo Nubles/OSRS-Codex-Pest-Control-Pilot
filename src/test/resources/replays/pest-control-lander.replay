@@ -1,0 +1,10 @@
+# Waiting in the novice lander, the plaque reads your points off the lander's overlay.
+include /replays/scenes/outpost.scene
+tick
+expect kicker = "PEST CONTROL"
+expect detail = "Board a lander to read your points"
+
+widget PestLanderOverlay.PEST_LANDER_OVER_LEVEL text "Novice"
+widget PestLanderOverlay.PEST_LANDER_OVER_POINTS text "Commendation points: 120"
+tick 2
+expect headline = "120 points"
