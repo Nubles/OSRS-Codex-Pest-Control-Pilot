@@ -1,0 +1,21 @@
+# The Void Knights' Outpost and a schematic Pest Control island for replays. Not the real map.
+#
+# Facts:
+#  - the outpost is map region 10537 (CodexPestControlPlugin.OUTPOST_REGION); the player starts in it
+#  - landers need combat 40, 70 or 100 (novice, intermediate, veteran); the portals are purple
+#    (west), blue (east), yellow (south-east) and red (south-west); the first shield drops 15
+#    seconds in, the rest every 30 seconds (oldschool.runescape.wiki/w/Pest_Control)
+#  - NPC, interface and varbit names are RuneLite's (net.runelite.api.gameval)
+
+scene 2600 2600
+skill ATTACK 60
+skill STRENGTH 60
+skill DEFENCE 60
+skill HITPOINTS 60
+at 2650 2650
+login
+
+# What the plaque on screen says.
+watch kicker plaque.shown.kicker
+watch headline plaque.shown.headline
+watch detail plaque.shown.detail
