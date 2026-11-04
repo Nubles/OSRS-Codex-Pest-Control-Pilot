@@ -205,6 +205,18 @@ public interface CodexPestControlConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "ghostOverlay",
+		name = "Ghost splits on screen",
+		description = "Show each part of the game in game ticks against your best game on the lander in the game view; the panel always shows them",
+		position = 6,
+		section = inGame
+	)
+	default boolean ghostOverlay()
+	{
+		return false;
+	}
+
+	@ConfigItem(
 		keyName = "notifyStart",
 		name = "Game start",
 		description = "Notify when a game begins, so you can wait in the lander with the client in the background",

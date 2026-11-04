@@ -148,6 +148,31 @@ public final class View
 
 	/** Whether the void card names the player; off to share it without the name. */
 	public boolean nameOnCard = true;
+	/** The game under way, or the last one, against the ghost on its lander; null with neither. */
+	public GhostSplits ghost;
+	/** The last game's grade card, shown until the next game begins; null with none. */
+	public com.codex.pestcontrol.core.Grade grade;
+
+	/** A game cut into its segments against its ghost, for the split table. */
+	public static final class GhostSplits
+	{
+		final GameRecord game;
+		final GameRecord ghost;
+		final boolean live;
+		final List<com.codex.pestcontrol.core.Ghost.Row> rows;
+
+		/**
+		 * @param game the game, or the one under way so far
+		 * @param ghost the ghost it is measured against, or null when there is none yet
+		 */
+		public GhostSplits(GameRecord game, GameRecord ghost, boolean live)
+		{
+			this.game = game;
+			this.ghost = ghost;
+			this.live = live;
+			this.rows = com.codex.pestcontrol.core.Ghost.rows(game, ghost, live);
+		}
+	}
 
 	/**
 	 * @param fight the game in progress, or null

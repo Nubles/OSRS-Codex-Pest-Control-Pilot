@@ -281,6 +281,10 @@ public class PilotPanel extends PluginPanel
 		if (f == null)
 		{
 			map.setFight(null);
+			if (view.grade != null)
+			{
+				addGrade(stack, view.grade, view.ghost);
+			}
 			if (view.state == View.State.LANDER)
 			{
 				if (view.landerTip != null)
@@ -346,7 +350,68 @@ public class PilotPanel extends PluginPanel
 
 		stack.add(new SectionHeader("Shield order", f.rotations == 1 ? "known" : f.rotations + " possible"));
 		stack.add(orderCard(f));
+		if (view.ghost != null)
+		{
+			stack.add(new SectionHeader("Ghost splits", view.ghost.ghost == null ? "no ghost yet" : "game ticks"));
+			Card splits = new Card(new BorderLayout(0, 4));
+			splits.accent(Theme.GOLD_DIM);
+			splits.add(new GhostTable(view.ghost), BorderLayout.CENTER);
+			if (view.ghost.ghost == null)
+			{
+				splits.add(Ui.wrapped("Win a game boarded from this lander and it becomes the ghost the next one races.",
+					Theme.small(), Theme.TEXT_FAINT, WIDTH - 30), BorderLayout.SOUTH);
+			}
+			stack.add(splits);
+		}
 		replace(battle, stack);
+	}
+
+	/** The last game's grade card: the letter, its points an hour against the ghost, and where the time went. */
+	private void addGrade(StackPanel stack, com.codex.pestcontrol.core.Grade grade, View.GhostSplits splits)
+	{
+		stack.add(new SectionHeader("Last game", grade.getLetter() == null ? (grade.isNewGhost() ? "ghost set" : "no ghost yet") : "against your ghost"));
+		Card card = new Card(new BorderLayout(0, 6));
+		card.accent(GradeMedal.tint(grade.getLetter())).highlighted(grade.getLetter() == com.codex.pestcontrol.core.Grade.Letter.S);
+		card.add(new GradeMedal(grade), BorderLayout.NORTH);
+		StackPanel body = new StackPanel(4, 0);
+		if (grade.getLetter() != null)
+		{
+			if (grade.getSinks().isEmpty())
+			{
+				body.add(Ui.wrapped("No part of the game ran " + com.codex.pestcontrol.core.Grade.SINK_MIN + " ticks or more over your ghost.",
+					Theme.small(), Theme.GREEN, WIDTH - 30));
+			}
+			else
+			{
+				body.add(Ui.label("WHERE THE TIME WENT", Theme.small(), Theme.TEXT_FAINT));
+				for (com.codex.pestcontrol.core.Grade.Sink sink : grade.getSinks())
+				{
+					body.add(Ui.wrapped(sink.sentence(), Theme.small(), Theme.TEXT, WIDTH - 30));
+				}
+			}
+		}
+		if (splits != null && splits.ghost != null)
+		{
+			body.add(new GhostTable(splits));
+		}
+		String foot;
+		if (grade.getLetter() == null)
+		{
+			foot = grade.isNewGhost()
+				? "Your first timed win on the " + grade.boatName() + " lander is now your ghost. The next game is split against it, tick by tick."
+				: "A won game boarded from the lander becomes your first ghost on it.";
+		}
+		else if (grade.isNewGhost())
+		{
+			foot = "Your best " + grade.boatName() + " game yet: the next one races it.";
+		}
+		else
+		{
+			foot = "Points an hour count the lander wait. S is within 2% of your ghost, A within 10%, B within 25%; a game with no points is a C.";
+		}
+		body.add(Ui.wrapped(foot, Theme.small(), Theme.TEXT_FAINT, WIDTH - 30));
+		card.add(body, BorderLayout.CENTER);
+		stack.add(card);
 	}
 
 	private Card adviceCard(Advice a)

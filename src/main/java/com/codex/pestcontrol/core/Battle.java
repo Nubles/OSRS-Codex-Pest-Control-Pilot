@@ -30,6 +30,12 @@ public class Battle
 	private final boolean[] shielded = {true, true, true, true};
 	private final boolean[] fallen = new boolean[4];
 	private final int[] health = {-1, -1, -1, -1};
+	/** The tick each portal was seen to fall, -1 until it has, or when it fell before the game was watched. */
+	private final int[] fallTicks = {-1, -1, -1, -1};
+	/** Portals in the order they fell. */
+	private final List<Portal> falls = new ArrayList<>();
+	/** Ticks waited in the lander before this game, or -1 when not seen boarding. */
+	private int wait = -1;
 	private final List<Portal> drops = new ArrayList<>();
 	private final List<Integer> dropTicks = new ArrayList<>();
 	private List<Rotation> possible = new ArrayList<>(Arrays.asList(Rotation.values()));
@@ -130,6 +136,11 @@ public class Battle
 
 	public void fall(Portal portal)
 	{
+		if (!fallen[portal.ordinal()])
+		{
+			fallTicks[portal.ordinal()] = ticks;
+			falls.add(portal);
+		}
 		fallen[portal.ordinal()] = true;
 		// A portal can only be killed with its shield down; when its drop was missed, its moment is unknown.
 		foundOpen(portal);
@@ -221,6 +232,29 @@ public class Battle
 		List<int[]> hits = ownHits.get(portal.ordinal());
 		trim(hits);
 		return !hits.isEmpty() && secondsToFall(portal) == STALLED;
+	}
+
+	/** The tick the portal fell, or -1. */
+	public int getFallTick(Portal portal)
+	{
+		return fallTicks[portal.ordinal()];
+	}
+
+	/** Portals in the order they fell. */
+	public List<Portal> getFalls()
+	{
+		return Collections.unmodifiableList(falls);
+	}
+
+	/** Ticks waited in the lander before the game, or -1 when it was not seen boarding. */
+	public int getWait()
+	{
+		return wait;
+	}
+
+	public void setWait(int wait)
+	{
+		this.wait = wait;
 	}
 
 	public void tick()

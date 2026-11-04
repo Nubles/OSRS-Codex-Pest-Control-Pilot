@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.Set;
 
 /**
@@ -40,6 +42,8 @@ public class Logbook
 	private long seconds;
 	private ShieldClock clock;
 	private Bests bests;
+	/** The ghost game for each lander, by {@link Ghost#key}: kept however old. */
+	private Map<String, GameRecord> ghosts = new TreeMap<>();
 
 	public Logbook()
 	{
@@ -98,6 +102,10 @@ public class Logbook
 			clock = new ShieldClock();
 		}
 		clock.repair();
+		ghosts = ghosts == null ? new TreeMap<>() : new TreeMap<>(ghosts);
+		ghosts.values().removeIf(g -> g == null);
+		ghosts.values().forEach(GameRecord::repair);
+		ghosts.entrySet().removeIf(e -> !Ghost.usable(e.getValue()) || !e.getKey().equals(Ghost.key(e.getValue().getBoat())));
 		// A save from before bests were kept starts from the games it holds.
 		bests = bests == null || bests.isEmpty() ? Bests.of(games) : bests.repair(games);
 		// The knights hold at most the cap; below zero is "not read yet".
@@ -215,6 +223,33 @@ public class Logbook
 		earned += game.getPoints();
 		seconds += game.getSeconds();
 		return beat;
+	}
+
+	/** The ghost game on a lander, or null. */
+	public GameRecord ghost(Boat boat)
+	{
+		String key = Ghost.key(boat);
+		return key == null ? null : ghosts.get(key);
+	}
+
+	/**
+	 * Offers a finished game as the ghost on its lander.
+	 *
+	 * @return whether it took the place of the ghost there was (or there was none)
+	 */
+	public boolean offerGhost(GameRecord game)
+	{
+		if (game == null || !Ghost.beats(game, ghost(game.getBoat())))
+		{
+			return false;
+		}
+		ghosts.put(Ghost.key(game.getBoat()), game);
+		return true;
+	}
+
+	public int ghostCount()
+	{
+		return ghosts.size();
 	}
 
 	public List<GameRecord> getGames()
