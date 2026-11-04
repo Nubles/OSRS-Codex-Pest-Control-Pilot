@@ -12,8 +12,6 @@ public final class GameSummary
 {
 	/** The warning comes this close to the cap. */
 	static final int CAP_WARN = 50;
-	/** Damage a game needs before it gives points. */
-	static final int ZEAL = 50;
 
 	private GameSummary()
 	{
@@ -76,18 +74,14 @@ public final class GameSummary
 				text.append("Won, +").append(game.getPoints()).append(game.getPoints() == 1 ? " point" : " points");
 				break;
 			case NO_POINTS:
-				// The damage counted here can miss what the game counts; only say how short when it was.
-				text.append(game.getDamage() < ZEAL ? "Won, but no points: " + game.getDamage() + " of the 50 damage needed"
-					: "Won, but the game gave no points for too little damage");
+				// The game gives no points when your activity bar runs out during the game.
+				text.append("Won, but no points: your activity bar ran out");
 				break;
 			default:
 				text.append("Lost");
 				break;
 		}
-		if (game.getResult() != GameRecord.Result.NO_POINTS)
-		{
-			text.append(", ").append(game.getDamage()).append(" damage");
-		}
+		text.append(", ").append(game.getDamage()).append(" damage");
 		if (after != null && after.isPointsKnown())
 		{
 			if (!after.isComplete() && !after.isAffordable())

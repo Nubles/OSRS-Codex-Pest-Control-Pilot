@@ -1,8 +1,6 @@
 package com.codex.pestcontrol.ui;
 
-import com.codex.pestcontrol.core.Battle;
 import com.codex.pestcontrol.core.GameRecord;
-import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FontMetrics;
@@ -14,8 +12,7 @@ import javax.swing.JComponent;
 
 /**
  * Your damage in each recent game as a row of bars, oldest on the left, coloured by how the game
- * ended, against the dashed line at the 50 damage a game needs for points. A bar short of the
- * line is a game that gave nothing for your time.
+ * ended. Points no longer need a set amount of damage, only an activity bar that never runs out.
  */
 class DamageChart extends JComponent
 {
@@ -39,7 +36,7 @@ class DamageChart extends JComponent
 		FontMetrics fm = g.getFontMetrics();
 		int w = getWidth();
 		int h = getHeight();
-		int most = Battle.DAMAGE_FOR_POINTS * 2;
+		int most = 100;
 		for (GameRecord game : games)
 		{
 			most = Math.max(most, game.getDamage());
@@ -57,23 +54,12 @@ class DamageChart extends JComponent
 		for (GameRecord game : games)
 		{
 			int bh = Math.max(2, (int) Math.round(span * Math.min(game.getDamage(), most) / (double) most));
-			Color c = game.getDamage() < Battle.DAMAGE_FOR_POINTS ? Theme.EMBER : GameRow.color(game.getResult());
+			Color c = GameRow.color(game.getResult());
 			g.setPaint(new GradientPaint(0, floor - bh, c, 0, floor, Theme.mix(c, Theme.INK, 0.6)));
 			g.fillRoundRect(x, floor - bh, slot, bh, 3, 3);
 			x += slot + gap;
 		}
 
-		int line = floor - (int) Math.round(span * Battle.DAMAGE_FOR_POINTS / (double) most);
-		g.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, new float[]{3, 3}, 0));
-		g.setColor(Theme.alpha(Theme.TEXT, 150));
-		g.drawLine(0, line, w, line);
-		// The line's key sits in the top corner, clear of the bars.
-		String label = Battle.DAMAGE_FOR_POINTS + " for points";
-		int lx = w - fm.stringWidth(label);
-		g.drawLine(lx - 16, fm.getAscent() / 2 + 1, lx - 4, fm.getAscent() / 2 + 1);
-		g.setStroke(new BasicStroke(1f));
-		g.setColor(Theme.TEXT_MUTED);
-		g.drawString(label, lx, fm.getAscent());
 		String peak = String.valueOf(most);
 		g.setColor(Theme.TEXT_FAINT);
 		g.drawString(peak, 0, fm.getAscent());

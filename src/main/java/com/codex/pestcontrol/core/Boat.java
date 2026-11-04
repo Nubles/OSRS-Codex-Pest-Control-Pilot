@@ -1,6 +1,9 @@
 package com.codex.pestcontrol.core;
 
-/** The three landers: the combat level to board and the points a won game gives. */
+/**
+ * The three landers: the combat level to board and the points a won game gives before Combat
+ * Achievement bonuses. The Easy, Medium and Hard tiers add 1, 2 and 3 points a win (OSRS Wiki, Pest Control).
+ */
 public enum Boat
 {
 	NOVICE("Novice", 40, 3),
@@ -47,7 +50,13 @@ public enum Boat
 		return NOVICE;
 	}
 
-	/** The lander a won game's points came from, or null for any other number. */
+	/** The most points a Combat Achievement tier adds to a win (the Hard tier). */
+	public static final int MOST_BONUS = 3;
+
+	/**
+	 * The lander a won game's points came from, or null for any other number. Only right without a
+	 * Combat Achievement bonus, so prefer the lander you were seen boarding.
+	 */
 	public static Boat forPoints(int points)
 	{
 		for (Boat b : values())

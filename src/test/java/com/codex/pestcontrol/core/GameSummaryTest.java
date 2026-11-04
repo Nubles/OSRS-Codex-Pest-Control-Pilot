@@ -24,20 +24,11 @@ public class GameSummaryTest
 	}
 
 	@Test
-	public void aGameWonShortOfTheDamageSaysHowShort()
+	public void aGameWonWithNoPointsBlamesTheActivityBar()
 	{
+		// Points need only an activity bar that never runs out; there is no damage threshold any more.
 		GameRecord g = new GameRecord(0, Boat.VETERAN, GameRecord.Result.NO_POINTS, 0, 34, 300);
-		assertEquals("Won, but no points: 34 of the 50 damage needed.", GameSummary.of(g, null, null));
-	}
-
-	@Test
-	public void noPointsWithTheDamageInDoesNotClaimTooLittle()
-	{
-		// The game said no points though the damage counted here was enough (a hit not seen as yours):
-		// "60 of the 50 needed" would make no sense.
-		GameRecord g = new GameRecord(0, Boat.VETERAN, GameRecord.Result.NO_POINTS, 0, 60, 300);
-		String text = GameSummary.of(g, null, null);
-		assertTrue(text, !text.contains("60 of the 50"));
+		assertEquals("Won, but no points: your activity bar ran out, 34 damage.", GameSummary.of(g, null, null));
 	}
 
 	@Test

@@ -1,7 +1,6 @@
 package com.codex.pestcontrol.ui;
 
 import com.codex.pestcontrol.core.Advice;
-import com.codex.pestcontrol.core.Battle;
 import com.codex.pestcontrol.core.Experience;
 import com.codex.pestcontrol.core.GameRecord;
 import com.codex.pestcontrol.core.Goal;
@@ -336,14 +335,13 @@ public class PilotPanel extends PluginPanel
 		int warn = view.knightWarn > 0 ? view.knightWarn : 60;
 		Color knight = f.knightHealth < 0 ? Theme.TEXT_MUTED : f.knightHealth <= warn ? Theme.BLOOD : f.knightHealth <= warn * 2 ? Theme.EMBER : Theme.GREEN;
 		tiles.add(new StatTile(f.knightHealth < 0 ? "-" : String.valueOf(f.knightHealth), "Knight", "health", knight));
-		boolean points = f.damage >= Battle.DAMAGE_FOR_POINTS;
-		tiles.add(new StatTile(String.valueOf(f.damage), "Damage", points ? "earned" : "of " + Battle.DAMAGE_FOR_POINTS, points ? Theme.GREEN : Theme.EMBER));
+		tiles.add(new StatTile(String.valueOf(f.damage), "Damage", "this game", Theme.GOLD));
 		Color active = f.activity < 0 ? Theme.TEXT_MUTED : f.activity < 30 ? Theme.EMBER : f.activity < 60 ? Theme.GOLD : Theme.GREEN;
 		tiles.add(new StatTile(f.activity < 0 ? "-" : f.activity + "%", "Activity", "zeal bar", active));
 		stack.add(tiles);
-		if (!points)
+		if (f.activity >= 0 && f.activity < 30)
 		{
-			stack.add(Ui.wrapped("Deal " + (Battle.DAMAGE_FOR_POINTS - f.damage) + " more damage to be given points for this game.", Theme.small(), Theme.EMBER, WIDTH - 16));
+			stack.add(Ui.wrapped("Your activity bar is low. If it runs out, this game gives no points.", Theme.small(), Theme.EMBER, WIDTH - 16));
 		}
 
 		stack.add(new SectionHeader("Shield order", f.rotations == 1 ? "known" : f.rotations + " possible"));
@@ -816,7 +814,8 @@ public class PilotPanel extends PluginPanel
 		else if (combat > 0)
 		{
 			com.codex.pestcontrol.core.Boat boat = com.codex.pestcontrol.core.Boat.forCombat(combat);
-			text += " Your level boards the " + boat.getTitle().toLowerCase(Locale.ENGLISH) + " lander, " + boat.getPoints() + " points a win.";
+			text += " Your level boards the " + boat.getTitle().toLowerCase(Locale.ENGLISH) + " lander, " + boat.getPoints() + " points a win, up to "
+				+ (boat.getPoints() + com.codex.pestcontrol.core.Boat.MOST_BONUS) + " with Combat Achievement tiers.";
 		}
 		return new String[]{title, text, buy};
 	}
@@ -1014,13 +1013,13 @@ public class PilotPanel extends PluginPanel
 		for (GameRecord g : finished)
 		{
 			sum += g.getDamage();
-			shortOf += g.getDamage() < Battle.DAMAGE_FOR_POINTS ? 1 : 0;
+			shortOf += g.getResult() == GameRecord.Result.NO_POINTS ? 1 : 0;
 		}
 		stack.add(new SectionHeader("Your damage", "last " + finished.size()));
 		Card card = new Card(new BorderLayout(0, 6));
 		card.add(new DamageChart(finished), BorderLayout.CENTER);
 		String line = "Average " + Math.round(sum / (double) finished.size()) + " a game. "
-			+ (shortOf == 0 ? "Every one of these earned its points." : shortOf + " of " + finished.size() + " fell short of the 50 for points.");
+			+ (shortOf == 0 ? "Every one of these earned its points." : shortOf + " of " + finished.size() + " gave no points: the activity bar ran out.");
 		card.add(Ui.wrapped(line, Theme.small(), shortOf == 0 ? Theme.TEXT_MUTED : Theme.EMBER, WIDTH - 30), BorderLayout.SOUTH);
 		stack.add(card);
 	}

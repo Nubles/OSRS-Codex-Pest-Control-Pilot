@@ -118,29 +118,35 @@ public class BattleTest
 	}
 
 	@Test
-	public void damageForPoints()
+	public void pointsNeedOnlyAnActivityBarThatNeverRunsOut()
 	{
 		Battle b = new Battle();
-		b.addDamage(30);
-		b.addDamage(-4);
-		assertFalse(b.hasPoints());
-		b.addDamage(20);
+		// Damage no longer decides it (the 50 damage rule is gone).
 		assertTrue(b.hasPoints());
+		b.noteActivity(0);
+		assertTrue("an empty bar before any reading above 0 is the bar not yet read", b.hasPoints());
+		b.noteActivity(40);
+		b.noteActivity(-1);
+		assertTrue(b.hasPoints());
+		b.noteActivity(0);
+		assertFalse(b.hasPoints());
+		b.noteActivity(80);
+		assertFalse("once it has run out, the game gives no points", b.hasPoints());
 	}
 
 	@Test
-	public void quieterPortalUntilYouHaveYourPoints()
+	public void quieterPortalWhileYourActivityIsLow()
 	{
 		Battle b = new Battle();
 		b.shieldDropped(Portal.PURPLE);
 		b.shieldDropped(Portal.BLUE);
 		b.setHealth(Portal.PURPLE, 60);
 		b.setHealth(Portal.BLUE, 180);
-		Field f = new Field().crowd(Portal.PURPLE, 14).crowd(Portal.BLUE, 3);
+		Field f = new Field().crowd(Portal.PURPLE, 14).crowd(Portal.BLUE, 3).activity(20);
 		Advice a = b.advise(f);
 		assertEquals(Portal.BLUE, a.getPortal());
-		assertEquals("Only 3 players there: easier damage for your points", a.getDetail());
-		b.addDamage(60);
+		assertEquals("Only 3 players there: easier damage to fill your activity bar", a.getDetail());
+		f.activity(70);
 		assertEquals(Portal.PURPLE, b.advise(f).getPortal());
 		assertEquals("Shield down, 60 health left, 14 players", b.advise(f).getDetail());
 	}

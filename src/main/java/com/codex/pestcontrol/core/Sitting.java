@@ -93,7 +93,7 @@ public final class Sitting
 		return points;
 	}
 
-	/** Games won without the 50 damage for points. */
+	/** Games won with no points, the activity bar having run out. */
 	public int getUnpaid()
 	{
 		return unpaid;
