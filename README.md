@@ -53,6 +53,18 @@ Part of the **Codex** suite of RuneLite plugins. They share one look: warm ink, 
 
 **Your bests.** The Record page keeps your most damage in a game, your fastest win and your longest run of wins, each with its day, and outlives the recent games list. When a game beats one, the summary in chat says so.
 
+**Ghost splits.** Every game is cut into its natural segments and timed in game ticks: the wait in the lander, the landing until the first shield drops, each portal falling (in the order they fall, from the one before), and the end. Your best game on each lander is kept as its ghost: the win, boarded from the lander, with the most points an hour counting the wait. During a game the Battle page shows a slim split table against the ghost, green where you are quicker and ember where you are slower, each portal marked in its colour. It is stats only; the advice on what to work next is unchanged.
+
+<p align="center">
+  <img src="docs/screenshots/ghost-splits.png" width="225" alt="Ghost splits during a game">
+</p>
+
+**Grade card.** When a game ends, the Battle page grades it S, A, B or C on its points an hour against the ghost (S within 2% or past it, A within 10%, B within 25%; a game with no points is a C) and names the one to three biggest time sinks in plain words: "2nd portal down (Blue): 94 ticks, ghost took 50". A win that beats the ghost becomes the new one, and the first win on a lander sets it. The grade also goes on the chat summary.
+
+<p align="center">
+  <img src="docs/screenshots/grade-card.png" width="225" alt="The grade card">
+</p>
+
 **Spare points.** Once your goal is covered, the Goal page shows what the points over it buy as combat experience at the reward shop, spent 100 at a time for the 10% bonus.
 
 **Chat.** After each game, a line with its points and damage, the points still to your goal and the sitting so far. A line says when your points first buy a piece, and a warning comes within 50 points of the 4,000 the knights will hold.
@@ -72,6 +84,7 @@ Part of the **Codex** suite of RuneLite plugins. They share one look: warm ink, 
 - **Void check on the plaque** (on): the warning when the void you wear gives no set bonus.
 - **Mark the reward shop** (on): your goal outlined in the reward shop.
 - **Alerts**: **Game start** (on), **Shield drop** and **Knight in danger** (off). Each uses RuneLite's own notification settings unless you change it.
+- **Ghost splits on screen** (off): the split table in the game view too, for games with the panel shut.
 - **Game summary in chat** and **Affordable pieces in chat** (both on).
 - **Lander for estimates** (Best for my level): which lander the games left assume until your own games are measured.
 - **Name on cards** (on): turn off to share the void card without your character's name.

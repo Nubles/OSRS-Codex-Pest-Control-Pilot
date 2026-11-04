@@ -11,7 +11,9 @@ import com.codex.pestcontrol.core.Field;
 import com.codex.pestcontrol.core.GameRecord;
 import com.codex.pestcontrol.core.GameWatch;
 import com.codex.pestcontrol.core.GameSummary;
+import com.codex.pestcontrol.core.Ghost;
 import com.codex.pestcontrol.core.Goal;
+import com.codex.pestcontrol.core.Grade;
 import com.codex.pestcontrol.core.Landers;
 import com.codex.pestcontrol.core.Logbook;
 import com.codex.pestcontrol.core.NavigatorGoals;
@@ -23,12 +25,14 @@ import com.codex.pestcontrol.core.SharedBank;
 import com.codex.pestcontrol.core.Sitting;
 import com.codex.pestcontrol.core.Style;
 import com.codex.pestcontrol.core.VoidCheck;
+import com.codex.pestcontrol.overlay.GhostOverlay;
 import com.codex.pestcontrol.overlay.MinimapMarker;
 import com.codex.pestcontrol.overlay.PilotPlaque;
 import com.codex.pestcontrol.overlay.PortalMarker;
 import com.codex.pestcontrol.overlay.RewardShopGuide;
 import com.codex.pestcontrol.ui.Actions;
 import com.codex.pestcontrol.ui.Format;
+import com.codex.pestcontrol.ui.GhostTable;
 import com.codex.pestcontrol.ui.ItemIcons;
 import com.codex.pestcontrol.ui.LoadingIcons;
 import com.codex.pestcontrol.ui.PilotPanel;
@@ -204,6 +208,14 @@ public class CodexPestControlPlugin extends Plugin
 	private Notifier notifier;
 
 	private final PilotPlaque plaque = new PilotPlaque();
+	private final GhostOverlay ghostOverlay = new GhostOverlay();
+	/** The game under way against the ghost on its lander, worked out each tick of it. */
+	private View.GhostSplits liveSplits;
+	/** The last game against the ghost it was measured with, and its grade, shown until the next game. */
+	private View.GhostSplits lastSplits;
+	private Grade lastGrade;
+	/** Ticks the lander's overlay has been seen in a row, for the boat wait before a game. */
+	private int landerTicks;
 	private final Map<Portal, NPC> portals = new EnumMap<>(Portal.class);
 	private final List<NPC> spinners = new ArrayList<>();
 	private final List<NPC> brawlers = new ArrayList<>();
@@ -278,6 +290,7 @@ public class CodexPestControlPlugin extends Plugin
 		overlayManager.add(marker);
 		overlayManager.add(minimap);
 		overlayManager.add(shopGuide);
+		overlayManager.add(ghostOverlay);
 		clientThread.invokeLater(() ->
 		{
 			loadProfile();
@@ -302,6 +315,7 @@ public class CodexPestControlPlugin extends Plugin
 		overlayManager.remove(marker);
 		overlayManager.remove(minimap);
 		overlayManager.remove(shopGuide);
+		overlayManager.remove(ghostOverlay);
 		clientToolbar.removeNavigation(navButton);
 		clientThread.invokeLater(() ->
 		{
@@ -604,6 +618,11 @@ public class CodexPestControlPlugin extends Plugin
 				// Only a game boarded from the lander is news, not one already on when the plugin started.
 				// The lander's overlay can close a tick or two before the game's bar shows.
 				battle.setWhole(ticksSinceLander <= LANDER_GRACE_TICKS);
+				// The boat wait counts only for a game boarded from the lander and seen there.
+				battle.setWait(battle.isWhole() && landerTicks > 0 ? landerTicks : -1);
+				landerTicks = 0;
+				lastGrade = null;
+				lastSplits = null;
 				if (battle.isWhole())
 				{
 					notifier.notify(config.notifyStart(), begun.getMessage());
@@ -664,6 +683,9 @@ public class CodexPestControlPlugin extends Plugin
 			{
 				battle.setKnightHealth(knight);
 			}
+			// The game so far against the ghost on its lander: stats only, the advice is unchanged.
+			liveSplits = new View.GhostSplits(Ghost.record(battle, 0, landerBoat, GameRecord.Result.WON, 0), logbook.ghost(landerBoat), true);
+			ghostOverlay.show(config.ghostOverlay() ? new GhostTable(liveSplits) : null);
 			for (Alerts.Alert a : alerts.check(battle, config.knightWarn()))
 			{
 				notifier.notify(a.getKind() == Alerts.Kind.SHIELD ? config.notifyShield() : config.notifyKnight(), a.getMessage());
@@ -696,6 +718,12 @@ public class CodexPestControlPlugin extends Plugin
 			boarding.leave();
 		}
 		ticksSinceLander = lander ? 0 : Math.min(ticksSinceLander + 1, LANDER_GRACE_TICKS + 1);
+		landerTicks = lander ? landerTicks + 1 : ticksSinceLander > LANDER_GRACE_TICKS ? 0 : landerTicks;
+		if (battle == null && liveSplits != null)
+		{
+			liveSplits = null;
+			ghostOverlay.show(null);
+		}
 		if (lander != inLander)
 		{
 			inLander = lander;
@@ -757,7 +785,13 @@ public class CodexPestControlPlugin extends Plugin
 		}
 		Outlook before = outlook();
 		long now = System.currentTimeMillis();
-		GameRecord game = new GameRecord(now, boat, outcome, earned, b.getDamage(), (int) Math.round(b.getTicks() * 0.6));
+		GameRecord game = Ghost.record(b, now, boat, outcome, earned);
+		GameRecord ghost = logbook.ghost(boat);
+		lastGrade = Grade.of(game, ghost);
+		lastSplits = lastGrade == null ? null : new View.GhostSplits(game, ghost, false);
+		liveSplits = null;
+		ghostOverlay.show(null);
+		logbook.offerGhost(game);
 		Set<Bests.Kind> beat = logbook.record(game, b.isWhole());
 		if (r.total >= 0)
 		{
@@ -796,6 +830,15 @@ public class CodexPestControlPlugin extends Plugin
 			return;
 		}
 		text = best == null ? text : text == null ? best + "." : text + " " + best + ".";
+		Grade g = lastGrade;
+		if (text != null && g != null && g.getLetter() != null)
+		{
+			text = text + " Grade " + g.getLetter() + " against your " + g.boatName() + " ghost" + (g.isNewGhost() ? ", the new ghost." : ".");
+		}
+		else if (text != null && g != null && g.isNewGhost())
+		{
+			text = text + " Now your " + g.boatName() + " ghost.";
+		}
 		chatMessageManager.queue(QueuedMessage.builder()
 			.type(ChatMessageType.CONSOLE)
 			.runeLiteFormattedMessage(new ChatMessageBuilder()
@@ -1002,6 +1045,9 @@ public class CodexPestControlPlugin extends Plugin
 		logbook = null;
 		shared = null;
 		sharedOwned = EnumSet.noneOf(Reward.class);
+		lastGrade = null;
+		lastSplits = null;
+		liveSplits = null;
 		int generation = ++loadGeneration;
 		if (profile == null)
 		{
@@ -1292,6 +1338,8 @@ public class CodexPestControlPlugin extends Plugin
 		view.knightWarn = config.knightWarn();
 		view.ready = state == View.State.LANDER ? boarding.getReady() : -1;
 		view.landerTip = state == View.State.LANDER && boarding.isQuiet(client.getWorld()) ? boarding.tip() : null;
+		view.ghost = battle != null ? liveSplits : lastSplits;
+		view.grade = battle != null ? null : lastGrade;
 		return view;
 	}
 

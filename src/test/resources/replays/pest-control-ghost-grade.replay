@@ -1,0 +1,131 @@
+# Ghost splits and the game grade. Two won novice games, each boarded after 30 ticks in the lander.
+# The first sets the ghost; the second takes 50 ticks longer over the blue portal and is graded B.
+# Facts (oldschool.runescape.wiki/w/Pest_Control): the first shield drops 15 seconds in (25 ticks
+# at 0.6 seconds a tick, wiki: Game tick) and the rest every 30 seconds (50 ticks); a won novice
+# game gives 3 points before Combat Achievement bonuses, as long as the activity bar never ran out.
+include /replays/scenes/outpost.scene
+watch grade lastGrade.letter
+watch newGhost lastGrade.newGhost
+watch sink lastGrade.sinks.0.sentence
+watch second lastGrade.sinks.1
+watch wait liveSplits.rows.0.mine
+watch blueMine liveSplits.rows.3.mine
+watch blueGhost liveSplits.rows.3.ghost
+watch blueDelta liveSplits.rows.3.delta
+watch overlay ghostOverlay.shown
+config ghostOverlay true
+tick
+
+# ---- Game one: the ghost. ------------------------------------------------------------------
+widget PestLanderOverlay.PEST_LANDER_OVER_LEVEL text "Novice"
+widget PestLanderOverlay.PEST_LANDER_OVER_POINTS text "Commendation points: 120"
+tick 30
+close PestLanderOverlay.PEST_LANDER_OVER_POINTS
+close PestLanderOverlay.PEST_LANDER_OVER_LEVEL
+npc PEST_PORTAL_SHIELD_1_ACTIVE "Portal" 2620 2650 3 as purple
+npc PEST_PORTAL_SHIELD_2_ACTIVE "Portal" 2680 2650 3 as blue
+npc PEST_PORTAL_SHIELD_3_ACTIVE "Portal" 2670 2620 3 as yellow
+npc PEST_PORTAL_SHIELD_4_ACTIVE "Portal" 2630 2620 3 as red
+widget PestStatusOverlay.PEST_STATUS_PORT1
+widget PestStatusOverlay.PEST_STATUS_PORTTXT1 text "250"
+widget PestStatusOverlay.PEST_STATUS_PORTTXT2 text "250"
+widget PestStatusOverlay.PEST_STATUS_PORTTXT3 text "250"
+widget PestStatusOverlay.PEST_STATUS_PORTTXT4 text "250"
+widget PestStatusOverlay.PEST_STATUS_OVER_HEALTH text "200"
+tick
+# The lander wait is counted, and there is no ghost yet.
+expect wait = 30
+expect blueGhost = -1
+expect overlay != null
+tick 24
+transform purple PEST_PORTAL_1_ACTIVE
+tick 34
+widget PestStatusOverlay.PEST_STATUS_PORTTXT1 text "0"
+tick
+tick 15
+transform blue PEST_PORTAL_2_ACTIVE
+tick 34
+widget PestStatusOverlay.PEST_STATUS_PORTTXT2 text "0"
+tick
+tick 15
+transform yellow PEST_PORTAL_3_ACTIVE
+tick 24
+widget PestStatusOverlay.PEST_STATUS_PORTTXT3 text "0"
+tick
+tick 25
+transform red PEST_PORTAL_4_ACTIVE
+tick 24
+widget PestStatusOverlay.PEST_STATUS_PORTTXT4 text "0"
+tick
+close PestStatusOverlay.PEST_STATUS_PORT1
+remove purple
+remove blue
+remove yellow
+remove red
+chat GAMEMESSAGE "Congratulations! You managed to destroy all the portals! We've awarded you 3 Void Knight Commendation points."
+tick 5
+# The first win on the lander has no letter and becomes the ghost; the overlay is gone.
+expect grade = null
+expect newGhost = true
+expect sink = null
+expect overlay = null
+
+# ---- Game two: the blue portal holds out 50 ticks longer. -----------------------------------
+widget PestLanderOverlay.PEST_LANDER_OVER_LEVEL text "Novice"
+widget PestLanderOverlay.PEST_LANDER_OVER_POINTS text "Commendation points: 120"
+tick 30
+close PestLanderOverlay.PEST_LANDER_OVER_POINTS
+close PestLanderOverlay.PEST_LANDER_OVER_LEVEL
+npc PEST_PORTAL_SHIELD_1_ACTIVE "Portal" 2620 2650 3 as purple
+npc PEST_PORTAL_SHIELD_2_ACTIVE "Portal" 2680 2650 3 as blue
+npc PEST_PORTAL_SHIELD_3_ACTIVE "Portal" 2670 2620 3 as yellow
+npc PEST_PORTAL_SHIELD_4_ACTIVE "Portal" 2630 2620 3 as red
+widget PestStatusOverlay.PEST_STATUS_PORT1
+widget PestStatusOverlay.PEST_STATUS_PORTTXT1 text "250"
+widget PestStatusOverlay.PEST_STATUS_PORTTXT2 text "250"
+widget PestStatusOverlay.PEST_STATUS_PORTTXT3 text "250"
+widget PestStatusOverlay.PEST_STATUS_PORTTXT4 text "250"
+widget PestStatusOverlay.PEST_STATUS_OVER_HEALTH text "200"
+tick
+expect grade = null
+expect blueGhost = 50
+tick 24
+transform purple PEST_PORTAL_1_ACTIVE
+tick 34
+widget PestStatusOverlay.PEST_STATUS_PORTTXT1 text "0"
+tick
+tick 15
+transform blue PEST_PORTAL_2_ACTIVE
+tick 50
+transform yellow PEST_PORTAL_3_ACTIVE
+tick
+# 66 ticks on blue so far, 16 over the ghost's 50: the gap shows while it is still standing.
+expect blueMine = 66
+expect blueDelta = 16
+tick 33
+widget PestStatusOverlay.PEST_STATUS_PORTTXT2 text "0"
+tick
+expect blueMine = 100
+expect blueDelta = 50
+tick 15
+transform red PEST_PORTAL_4_ACTIVE
+tick 14
+widget PestStatusOverlay.PEST_STATUS_PORTTXT3 text "0"
+tick
+tick 39
+widget PestStatusOverlay.PEST_STATUS_PORTTXT4 text "0"
+tick
+close PestStatusOverlay.PEST_STATUS_PORT1
+remove purple
+remove blue
+remove yellow
+remove red
+chat GAMEMESSAGE "Congratulations! You managed to destroy all the portals! We've awarded you 3 Void Knight Commendation points."
+tick 5
+# 3 points in 30 + 230 ticks against the ghost's 3 in 30 + 200: 230/260 of its rate, 88%, a B
+# (A needs 90%). Blue took 100 ticks from purple's fall to its own, the ghost 50; yellow and red
+# fell quicker than the ghost's, so they are not named.
+expect grade = B
+expect newGhost = false
+expect sink = "2nd portal down (Blue): 100 ticks, ghost took 50"
+expect second = null
