@@ -1,5 +1,6 @@
 package com.codex.pestcontrol;
 
+import com.codex.pestcontrol.notes.FieldNotes;
 import com.codex.pestcontrol.core.Advice;
 import com.codex.pestcontrol.core.Alerts;
 import com.codex.pestcontrol.core.Battle;
@@ -195,6 +196,9 @@ public class CodexPestControlPlugin extends Plugin
 	@Inject
 	private CodexPestControlConfig config;
 
+	/** The optional local record of what the plugin read and decided. */
+	private FieldNotes notes;
+
 	@Inject
 	private PortalMarker marker;
 
@@ -277,6 +281,11 @@ public class CodexPestControlPlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
+		notes = new FieldNotes(this::getPluginDirectory, gson);
+		if (config.fieldNotes())
+		{
+			notes.open();
+		}
 		ItemIcons icons = new LoadingIcons(itemManager::getImage);
 		panel = new PilotPanel(icons, new PanelActions());
 		navButton = NavigationButton.builder()
@@ -311,6 +320,11 @@ public class CodexPestControlPlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
+		if (notes != null)
+		{
+			notes.shutdown();
+			notes = null;
+		}
 		overlayManager.remove(plaque);
 		overlayManager.remove(marker);
 		overlayManager.remove(minimap);
@@ -414,6 +428,18 @@ public class CodexPestControlPlugin extends Plugin
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
+		if (CodexPestControlConfig.GROUP.equals(event.getGroup()) && "fieldNotes".equals(event.getKey()) && notes != null)
+		{
+			if (config.fieldNotes())
+			{
+				notes.open();
+			}
+			else
+			{
+				notes.close();
+			}
+			return;
+		}
 		if (CodexPestControlConfig.GROUP.equals(event.getGroup()))
 		{
 			dirty = true;
@@ -525,6 +551,19 @@ public class CodexPestControlPlugin extends Plugin
 	@Subscribe
 	public void onChatMessage(ChatMessage event)
 	{
+		if (notes != null && notes.isOpen())
+		{
+			net.runelite.api.ChatMessageType chatType = event.getType();
+			// Only the game's own lines: other players' chat is never written down.
+			if (chatType == net.runelite.api.ChatMessageType.GAMEMESSAGE || chatType == net.runelite.api.ChatMessageType.SPAM
+				|| chatType == net.runelite.api.ChatMessageType.MESBOX)
+			{
+				com.google.gson.JsonObject chatNote = new com.google.gson.JsonObject();
+				chatNote.addProperty("type", chatType.name());
+				chatNote.addProperty("text", event.getMessage());
+				notes.note("chat", chatNote);
+			}
+		}
 		if (event.getType() != ChatMessageType.GAMEMESSAGE)
 		{
 			return;
@@ -1217,6 +1256,32 @@ public class CodexPestControlPlugin extends Plugin
 		boolean outpost = me != null && me.getWorldLocation().getRegionID() == OUTPOST_REGION;
 		View.State state = battle != null ? View.State.BATTLE : inLander ? View.State.LANDER : outpost ? View.State.OUTPOST : View.State.AWAY;
 		View view = view(state, fight, now);
+		if (notes.isOpen())
+		{
+			// The portal advice and the read behind it, so a wrong pick can be traced.
+			com.google.gson.JsonObject n = new com.google.gson.JsonObject();
+			n.addProperty("state", String.valueOf(state));
+			if (advice != null)
+			{
+				n.addProperty("advice", String.valueOf(advice.getKind()));
+				n.addProperty("portal", String.valueOf(advice.getPortal()));
+				n.addProperty("candidates", String.valueOf(advice.getCandidates()));
+				n.addProperty("headline", advice.getHeadline());
+				n.addProperty("detail", advice.getDetail());
+			}
+			if (battle != null)
+			{
+				com.google.gson.JsonArray portals = new com.google.gson.JsonArray();
+				for (Portal p : Portal.values())
+				{
+					portals.add(p + (battle.isShielded(p) ? " shielded" : "") + (battle.isFallen(p) ? " fallen" : " hp " + battle.getHealth(p)));
+				}
+				n.add("portals", portals);
+				n.addProperty("order", String.valueOf(battle.expectedOrder()));
+				n.addProperty("possible", battle.getPossible().size());
+			}
+			notes.noteChanged("advice", n);
+		}
 		Outlook outlook = outlook();
 		showPlaque(state, advice, battle, outlook, Goal.matching(logbook.getGoal()), view.voidCheck);
 		showMarker(advice);
