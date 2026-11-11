@@ -27,6 +27,13 @@ Part of the **Codex** suite of RuneLite plugins. They share one look: warm ink, 
 
 **Marked in the world.** The portal to work gets an outline in its colour, a ring on its tile, a word over it and a ring on the minimap. While the next drop is still open, every portal it could be is faintly outlined.
 
+**Hardcore Worlds.** On a Hardcore World, Pest Control is not a safe death: the game's rules list it among the activities where dying is an official death, after which you reset the character or transfer it off Hardcore Worlds. The Pilot knows the world from the client's own world type and says so calmly: a ribbon under the crest on every page, a fuller note on the Battle page before you board, and a line across the top of the plaque at the outpost, in the lander and in the game. On these worlds it also stops suggesting world 344 for a quiet lander, since Hardcore World characters play on their own servers.
+
+<p align="center">
+  <img src="docs/screenshots/hardcore-outpost.png" width="225" alt="The Hardcore World warning at the outpost">
+  <img src="docs/screenshots/hardcore-plaque.png" alt="The plaque on a Hardcore World">
+</p>
+
 **Activity for points.** A won game gives points as long as your activity bar never runs out (there is no longer a 50 damage rule). The panel warns when the bar is low, and the plaque and the panel count your damage. If the client drops its connection mid-game and gets it back, the count carries on.
 
 **Alerts.** With the client in the background, a notification says when the game begins, so you can wait in the lander doing something else. You can also be told when a shield drops (with its gate and the portal due next) and when the Void Knight falls low.
@@ -82,6 +89,7 @@ Part of the **Codex** suite of RuneLite plugins. They share one look: warm ink, 
 - **Mark the portal** and **Mark possible next portals** (both on): the outlines in the world and on the minimap.
 - **Defend knight below** (60): the knight's health at which defending him comes first; 0 turns it off.
 - **Void check on the plaque** (on): the warning when the void you wear gives no set bonus.
+- **Hardcore World warning** (on): the line on the plaque on a Hardcore World. The panel always shows it.
 - **Mark the reward shop** (on): your goal outlined in the reward shop.
 - **Alerts**: **Game start** (on), **Shield drop** and **Knight in danger** (off). Each uses RuneLite's own notification settings unless you change it.
 - **Ghost splits on screen** (off): the split table in the game view too, for games with the panel shut.
@@ -105,7 +113,7 @@ Everything is kept per account in your RuneLite profile. A save damaged on disk 
 
 ## Rules posture
 
-Codex Pest Control Pilot only reads what the game already shows you: the portals, the knight, the status bar, your hitsplats, your gear, pack and bank, and the chat messages the game sends. It outlines objects and draws its own panel and plaque. It does not click, move, attack, change menus, or send anything over the network; you do every click.
+Codex Pest Control Pilot only reads what the game already shows you: the portals, the knight, the status bar, your hitsplats, your gear, pack and bank, the world's type, and the chat messages the game sends. It outlines objects and draws its own panel and plaque. It does not click, move, attack, change menus, or send anything over the network; you do every click.
 
 ## Development
 

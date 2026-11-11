@@ -152,6 +152,8 @@ public final class View
 	public GhostSplits ghost;
 	/** The last game's grade card, shown until the next game begins; null with none. */
 	public com.codex.pestcontrol.core.Grade grade;
+	/** On a Hardcore World, where a death in Pest Control is not safe. */
+	public boolean hardcoreWorld;
 
 	/** A game cut into its segments against its ghost, for the split table. */
 	public static final class GhostSplits

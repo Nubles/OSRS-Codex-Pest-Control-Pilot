@@ -55,6 +55,8 @@ public class PilotPanel extends PluginPanel
 	private final JScrollPane battle = scroller();
 	private final JScrollPane goal = scroller();
 	private final JScrollPane record = scroller();
+	/** The Hardcore World warning under the crest, on every page while on one. */
+	private final JPanel ribbon = new JPanel(new BorderLayout());
 
 	private View view = View.loggedOut();
 	private String goalShown;
@@ -79,6 +81,12 @@ public class PilotPanel extends PluginPanel
 		JPanel north = new JPanel(new BorderLayout());
 		north.setOpaque(false);
 		north.add(crest, BorderLayout.NORTH);
+		ribbon.setOpaque(false);
+		ribbon.setBorder(new EmptyBorder(8, 8, 0, 8));
+		ribbon.add(new LifeWarning(com.codex.pestcontrol.core.HardcoreWorld.KICKER, com.codex.pestcontrol.core.HardcoreWorld.LINE, null, WIDTH),
+			BorderLayout.CENTER);
+		ribbon.setVisible(false);
+		north.add(ribbon, BorderLayout.CENTER);
 		JPanel tabHolder = new JPanel(new BorderLayout());
 		tabHolder.setOpaque(false);
 		tabHolder.setBorder(new EmptyBorder(8, 8, 2, 8));
@@ -112,6 +120,12 @@ public class PilotPanel extends PluginPanel
 	{
 		boolean started = view.state == View.State.BATTLE && this.view.state != View.State.BATTLE;
 		this.view = view;
+		boolean warn = view.hardcoreWorld && view.state != View.State.LOGGED_OUT;
+		if (ribbon.isVisible() != warn)
+		{
+			ribbon.setVisible(warn);
+			revalidate();
+		}
 		presets.setSelected(view.preset == null ? -1 : view.preset.ordinal(), false);
 		updateCrest();
 		rebuild();
@@ -258,6 +272,19 @@ public class PilotPanel extends PluginPanel
 
 	// The Battle tab.
 
+	/** What an official death on a Hardcore World means, in full, with where the rules come from. */
+	static Card hardcoreCard()
+	{
+		Card card = new Card(new BorderLayout(0, 4));
+		card.accent(Theme.EMBER);
+		card.add(Ui.label("If you die in a game", Theme.body(), Theme.EMBER), BorderLayout.NORTH);
+		StackPanel words = new StackPanel(3, 0);
+		words.add(Ui.wrapped(com.codex.pestcontrol.core.HardcoreWorld.DETAIL, Theme.small(), Theme.TEXT_MUTED, WIDTH - 30));
+		words.add(Ui.wrapped(com.codex.pestcontrol.core.HardcoreWorld.SOURCE, Theme.small(), Theme.TEXT_FAINT, WIDTH - 30));
+		card.add(words, BorderLayout.CENTER);
+		return card;
+	}
+
 	/** What the void worn now does for the weapon in hand: green when the set bonus is on, ember when it is lost. */
 	private static Card voidCard(com.codex.pestcontrol.core.VoidCheck check)
 	{
@@ -312,6 +339,11 @@ public class PilotPanel extends PluginPanel
 			else
 			{
 				stack.add(note("Not in a game", "Take the boat from Port Sarim to the Void Knights' Outpost and board a lander. The Pilot takes over once the game starts."));
+			}
+			if (view.hardcoreWorld)
+			{
+				// Before boarding is when it can still change what the player does.
+				stack.add(hardcoreCard());
 			}
 			if (view.voidCheck != null)
 			{
