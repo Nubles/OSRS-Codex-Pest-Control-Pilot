@@ -1,0 +1,57 @@
+# On a Hardcore World the plaque keeps a line saying a death in Pest Control is not safe, and the
+# quiet lander tip, which names a world on the standard servers, is not given.
+# Facts (oldschool.runescape.wiki/w/Hardcore_Worlds): "The following activities are UNSAFE and
+# dying in them will result in an official death", Pest Control among them; Hardcore Worlds "run
+# on a separate set of servers than the standard worlds". RuneLite flags these worlds with the
+# world type HARDCORE_MAIN (net.runelite.api.WorldType). The world numbers here are made up.
+include /replays/scenes/outpost.scene
+watch banner plaque.shown.banner
+world 302 MEMBERS HARDCORE_MAIN
+tick
+expect kicker = "PEST CONTROL"
+expect banner = "HARDCORE WORLD: a death here is not safe"
+
+# In the lander, two aboard for well over half a minute: no hop to world 344 is suggested.
+widget PestLanderOverlay.PEST_LANDER_OVER_LEVEL text "Novice"
+widget PestLanderOverlay.PEST_LANDER_OVER_POINTS text "Commendation points: 120"
+widget PestLanderOverlay.PEST_LANDER_OVER_PL text "Players Ready: 2"
+never kicker = "QUIET LANDER"
+tick 60
+expect headline = "120 points"
+expect banner = "HARDCORE WORLD: a death here is not safe"
+
+# The game itself keeps the line over the advice.
+close PestLanderOverlay.PEST_LANDER_OVER_POINTS
+close PestLanderOverlay.PEST_LANDER_OVER_LEVEL
+close PestLanderOverlay.PEST_LANDER_OVER_PL
+npc PEST_PORTAL_SHIELD_1_ACTIVE "Portal" 2620 2650 3 as purple
+npc PEST_PORTAL_SHIELD_2_ACTIVE "Portal" 2680 2650 3 as blue
+npc PEST_PORTAL_SHIELD_3_ACTIVE "Portal" 2670 2620 3 as yellow
+npc PEST_PORTAL_SHIELD_4_ACTIVE "Portal" 2630 2620 3 as red
+widget PestStatusOverlay.PEST_STATUS_PORT1
+widget PestStatusOverlay.PEST_STATUS_PORTTXT1 text "250"
+widget PestStatusOverlay.PEST_STATUS_PORTTXT2 text "250"
+widget PestStatusOverlay.PEST_STATUS_PORTTXT3 text "250"
+widget PestStatusOverlay.PEST_STATUS_PORTTXT4 text "250"
+widget PestStatusOverlay.PEST_STATUS_OVER_HEALTH text "200"
+tick 2
+expect kicker = "WAIT"
+expect banner = "HARDCORE WORLD: a death here is not safe"
+
+# The setting turns the plaque's line off.
+config hardcoreWarning false
+tick
+expect banner = null
+config hardcoreWarning true
+tick
+expect banner = "HARDCORE WORLD: a death here is not safe"
+
+# Back on an ordinary world, after a hop, the line goes.
+forget
+close PestStatusOverlay.PEST_STATUS_PORT1
+state HOPPING
+world 301 MEMBERS
+state LOADING
+state LOGGED_IN
+tick 8
+expect banner = null

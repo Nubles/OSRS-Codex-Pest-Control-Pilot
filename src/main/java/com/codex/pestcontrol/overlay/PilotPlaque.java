@@ -38,6 +38,8 @@ public class PilotPlaque extends Overlay
 		final String detail;
 		final String foot;
 		final Color footColor;
+		/** A warning over everything else, such as a Hardcore World's, or null. */
+		String banner;
 		/** The layout, worked out on the first frame this is shown and kept, so a frame measures and allocates nothing. */
 		private java.util.List<String> lines;
 		private int width;
@@ -59,6 +61,22 @@ public class PilotPlaque extends Overlay
 			this.foot = foot;
 			this.footColor = footColor;
 		}
+
+		/**
+		 * Puts a calm warning in a strip across the top, over the kicker. Set before it is shown.
+		 *
+		 * @param banner the warning, or null for none
+		 */
+		public Shown banner(String banner)
+		{
+			this.banner = banner;
+			return this;
+		}
+
+		public String getBanner()
+		{
+			return banner;
+		}
 	}
 
 	public PilotPlaque()
@@ -73,7 +91,21 @@ public class PilotPlaque extends Overlay
 	}
 
 	@Override
-	public Dimension render(Graphics2D g)
+	public Dimension render(Graphics2D graphics)
+	{
+		// Drawn on a copy, so the clip, font, colour and hints RuneLite hands every overlay come back as they were.
+		Graphics2D g = (Graphics2D) graphics.create();
+		try
+		{
+			return draw(g);
+		}
+		finally
+		{
+			g.dispose();
+		}
+	}
+
+	private Dimension draw(Graphics2D g)
 	{
 		Shown s = shown;
 		if (s == null)
@@ -111,9 +143,23 @@ public class PilotPlaque extends Overlay
 		g.setColor(SHINE);
 		g.drawLine(8, 1, width - 8, 1);
 
-		g.drawImage(MARK, PAD + 2, PAD + 2, null);
+		int top = 0;
+		if (s.banner != null)
+		{
+			// The warning sits in its own ember-washed strip, ruled off from the rest.
+			top = bannerHeight(small);
+			g.clip(s.shape);
+			g.setPaint(new GradientPaint(0, 0, Theme.alpha(Theme.BLOOD_DEEP, 200), width, 0, Theme.alpha(Theme.BLOOD_DEEP, 40)));
+			g.fillRect(0, 0, width, top);
+			g.setClip(clip);
+			g.setColor(Theme.alpha(Theme.EMBER, 120));
+			g.drawLine(6, top, width - 6, top);
+			g.setFont(Theme.small());
+			Ui.shadowed(g, s.banner, PAD + 2, BANNER_PAD + small.getAscent(), Theme.EMBER);
+		}
+		g.drawImage(MARK, PAD + 2, top + PAD + 2, null);
 		int x = PAD + ICON + 10;
-		int y = PAD + small.getAscent();
+		int y = top + PAD + small.getAscent();
 		g.setFont(Theme.small());
 		Ui.shadowed(g, s.kicker, x, y, Theme.TEXT_MUTED);
 		y += small.getDescent() + bold.getAscent() + 1;
@@ -138,10 +184,19 @@ public class PilotPlaque extends Overlay
 	/** The mark, drawn once. */
 	private static final BufferedImage MARK = Sigil.icon(ICON);
 
+	/** Space above and below the banner's line. */
+	private static final int BANNER_PAD = 4;
+
+	private static int bannerHeight(FontMetrics small)
+	{
+		return BANNER_PAD * 2 + small.getHeight() - 2;
+	}
+
 	private static void layout(Shown s, FontMetrics bold, FontMetrics small)
 	{
 		java.util.List<String> detail = wrap(s.detail, small, MAX_TEXT);
 		int textW = Math.max(bold.stringWidth(s.headline), small.stringWidth(s.kicker));
+		int bannerW = s.banner == null ? 0 : small.stringWidth(s.banner) + PAD + 2 + PAD;
 		for (String line : detail)
 		{
 			textW = Math.max(textW, small.stringWidth(line));
@@ -150,9 +205,10 @@ public class PilotPlaque extends Overlay
 		{
 			textW = Math.max(textW, small.stringWidth(s.foot));
 		}
-		s.width = Math.max(MIN_WIDTH, PAD + ICON + 8 + textW + PAD + 2);
+		s.width = Math.max(Math.max(MIN_WIDTH, bannerW), PAD + ICON + 8 + textW + PAD + 2);
 		int lines = 2 + detail.size() + (s.foot != null ? 1 : 0);
-		s.height = PAD + small.getHeight() + bold.getHeight() + (lines - 2) * small.getHeight() + PAD - 2;
+		s.height = PAD + small.getHeight() + bold.getHeight() + (lines - 2) * small.getHeight() + PAD - 2
+			+ (s.banner == null ? 0 : bannerHeight(small));
 		s.shape = new RoundRectangle2D.Float(0.5f, 0.5f, s.width - 1, s.height - 1, 12, 12);
 		s.fill = new GradientPaint(0, 0, Theme.alpha(Theme.CARD_TOP, 236), 0, s.height, Theme.alpha(Theme.INK_DEEP, 236));
 		s.edge = new GradientPaint(0, 0, s.color, 0, s.height, Theme.alpha(s.color, 70));

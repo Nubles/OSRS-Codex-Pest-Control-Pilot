@@ -14,6 +14,7 @@ import com.codex.pestcontrol.core.GameSummary;
 import com.codex.pestcontrol.core.Ghost;
 import com.codex.pestcontrol.core.Goal;
 import com.codex.pestcontrol.core.Grade;
+import com.codex.pestcontrol.core.HardcoreWorld;
 import com.codex.pestcontrol.core.Landers;
 import com.codex.pestcontrol.core.Logbook;
 import com.codex.pestcontrol.core.NavigatorGoals;
@@ -254,6 +255,8 @@ public class CodexPestControlPlugin extends Plugin
 	private Result result = new Result();
 	private Boat landerBoat;
 	private boolean inLander;
+	/** Whether this world is a Hardcore World, where a death in Pest Control is not safe; read from the world's type flags each tick. */
+	private boolean hardcoreWorld;
 	private boolean dirty;
 	private boolean unsaved;
 	/** Counts logbook loads, so a slow read that an account switch or shutdown overtook is dropped. */
@@ -297,6 +300,7 @@ public class CodexPestControlPlugin extends Plugin
 			watch.reset();
 			if (client.getGameState() == GameState.LOGGED_IN)
 			{
+				hardcoreWorld = HardcoreWorld.is(client.getWorldType());
 				carriedOwned = carried();
 				worn = owned(client.getItemContainer(InventoryID.WORN));
 				for (NPC npc : client.getTopLevelWorldView().npcs())
@@ -368,6 +372,8 @@ public class CodexPestControlPlugin extends Plugin
 			rejoining = state == GameState.CONNECTION_LOST;
 			if (state != GameState.CONNECTION_LOST)
 			{
+				// The next world's type is read on its first tick.
+				hardcoreWorld = false;
 				if (battle != null && logbook != null)
 				{
 					finish(battle, true);
@@ -595,6 +601,12 @@ public class CodexPestControlPlugin extends Plugin
 		if (logbook == null || client.getGameState() != GameState.LOGGED_IN)
 		{
 			return;
+		}
+		boolean hardcore = HardcoreWorld.is(client.getWorldType());
+		if (hardcore != hardcoreWorld)
+		{
+			hardcoreWorld = hardcore;
+			dirty = true;
 		}
 		switch (watch.tick(visible(InterfaceID.PestStatusOverlay.PEST_STATUS_PORT1)))
 		{
@@ -1337,9 +1349,10 @@ public class CodexPestControlPlugin extends Plugin
 		view.bests = logbook.getBests().copy();
 		view.knightWarn = config.knightWarn();
 		view.ready = state == View.State.LANDER ? boarding.getReady() : -1;
-		view.landerTip = state == View.State.LANDER && boarding.isQuiet(client.getWorld()) ? boarding.tip() : null;
+		view.landerTip = state == View.State.LANDER && quietLander() ? boarding.tip() : null;
 		view.ghost = battle != null ? liveSplits : lastSplits;
 		view.grade = battle != null ? null : lastGrade;
+		view.hardcoreWorld = hardcoreWorld;
 		return view;
 	}
 
@@ -1405,29 +1418,44 @@ public class CodexPestControlPlugin extends Plugin
 				foot = "Your activity bar ran out: no points this game";
 				footColor = Theme.EMBER;
 			}
-			plaque.show(new PilotPlaque.Shown(kicker, advice.getHeadline(), colour, advice.getDetail(), foot, footColor));
+			plaque.show(banner(new PilotPlaque.Shown(kicker, advice.getHeadline(), colour, advice.getDetail(), foot, footColor)));
 			return;
 		}
 		if (voidCheck != null && voidCheck.isWarning() && config.voidCheck())
 		{
 			// Still time to fix it before the game: that matters more than the points tally.
-			plaque.show(new PilotPlaque.Shown("VOID CHECK", voidCheck.getHeadline(), Theme.EMBER, voidCheck.getDetail(), null, null));
+			plaque.show(banner(new PilotPlaque.Shown("VOID CHECK", voidCheck.getHeadline(), Theme.EMBER, voidCheck.getDetail(), null, null)));
 			return;
 		}
-		if (state == View.State.LANDER && boarding.isQuiet(client.getWorld()))
+		if (state == View.State.LANDER && quietLander())
 		{
-			plaque.show(new PilotPlaque.Shown("QUIET LANDER", "Try world " + Boarding.PEST_CONTROL_WORLD, Theme.GOLD_BRIGHT, boarding.tip(), null, null));
+			plaque.show(banner(new PilotPlaque.Shown("QUIET LANDER", "Try world " + Boarding.PEST_CONTROL_WORLD, Theme.GOLD_BRIGHT, boarding.tip(), null, null)));
 			return;
 		}
 		String goal = preset != null ? preset.getTitle() : "Your goal";
 		if (o == null || !o.isPointsKnown())
 		{
-			plaque.show(new PilotPlaque.Shown("PEST CONTROL", goal, Theme.GOLD, "Board a lander to read your points", null, null));
+			plaque.show(banner(new PilotPlaque.Shown("PEST CONTROL", goal, Theme.GOLD, "Board a lander to read your points", null, null)));
 			return;
 		}
 		String detail = goalDetail(o, client.getVarbitValue(VarbitID.WESTERN_DIARY_HARD_COMPLETE) == 1);
-		plaque.show(new PilotPlaque.Shown("PEST CONTROL", Format.number(o.getPoints()) + " points", Theme.GOLD_BRIGHT,
-			goal + ": " + detail, null, null));
+		plaque.show(banner(new PilotPlaque.Shown("PEST CONTROL", Format.number(o.getPoints()) + " points", Theme.GOLD_BRIGHT,
+			goal + ": " + detail, null, null)));
+	}
+
+	/** The Hardcore World line across the top of the plaque, when on one and the setting is on. */
+	private PilotPlaque.Shown banner(PilotPlaque.Shown shown)
+	{
+		return hardcoreWorld && config.hardcoreWarning() ? shown.banner(HardcoreWorld.PLAQUE) : shown;
+	}
+
+	/**
+	 * The lander has sat short of players for a while. Not on a Hardcore World: its characters
+	 * cannot hop to the busy world on the standard servers that the tip names.
+	 */
+	private boolean quietLander()
+	{
+		return !hardcoreWorld && boarding.isQuiet(client.getWorld());
 	}
 
 	private void showShop(Outlook o)

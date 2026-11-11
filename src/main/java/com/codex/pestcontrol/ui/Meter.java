@@ -53,12 +53,13 @@ class Meter extends JComponent
 		int fw = (int) Math.round((w - 2) * fill.get());
 		if (fw > 0)
 		{
-			g.setClip(track);
+			java.awt.Shape old = g.getClip();
+			g.clip(track);
 			g.setPaint(new GradientPaint(0, y, Theme.mix(color, Color.WHITE, 0.3), 0, y + h, Theme.mix(color, Theme.INK_DEEP, 0.3)));
 			g.fill(new RoundRectangle2D.Float(1, y + 1, fw, h - 2, h - 2, h - 2));
 			g.setColor(Theme.alpha(Color.WHITE, 60));
 			g.drawLine(3, y + 2, Math.max(3, fw - 2), y + 2);
-			g.setClip(null);
+			g.setClip(old);
 		}
 		g.setColor(Theme.STROKE_SOFT);
 		g.draw(track);

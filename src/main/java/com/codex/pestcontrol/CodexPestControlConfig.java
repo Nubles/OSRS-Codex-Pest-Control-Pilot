@@ -217,6 +217,18 @@ public interface CodexPestControlConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "hardcoreWarning",
+		name = "Hardcore World warning",
+		description = "On a Hardcore World, keep a line on the plaque saying that a death in Pest Control is not safe there",
+		position = 7,
+		section = inGame
+	)
+	default boolean hardcoreWarning()
+	{
+		return true;
+	}
+
+	@ConfigItem(
 		keyName = "notifyStart",
 		name = "Game start",
 		description = "Notify when a game begins, so you can wait in the lander with the client in the background",
