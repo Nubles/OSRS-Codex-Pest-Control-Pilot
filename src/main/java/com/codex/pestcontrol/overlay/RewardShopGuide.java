@@ -66,7 +66,21 @@ public class RewardShopGuide extends Overlay
 	}
 
 	@Override
-	public Dimension render(Graphics2D g)
+	public Dimension render(Graphics2D graphics)
+	{
+		// Drawn on a copy, so the clip, font, colour and hints RuneLite hands every overlay come back as they were.
+		Graphics2D g = (Graphics2D) graphics.create();
+		try
+		{
+			return draw(g);
+		}
+		finally
+		{
+			g.dispose();
+		}
+	}
+
+	private Dimension draw(Graphics2D g)
 	{
 		Guide gd = guide;
 		if (gd == null || gd.goal.isEmpty())

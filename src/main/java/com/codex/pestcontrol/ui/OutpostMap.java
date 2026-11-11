@@ -110,11 +110,12 @@ public class OutpostMap extends JComponent
 		RoundRectangle2D well = new RoundRectangle2D.Float(0.5f, 0.5f, w - 1, h - 1, Theme.RADIUS, Theme.RADIUS);
 		g.setPaint(new GradientPaint(0, 0, Theme.mix(Theme.INK_DEEP, Theme.TEAL, 0.06), 0, h, Theme.INK_DEEP));
 		g.fill(well);
-		g.setClip(well);
+		java.awt.Shape old = g.getClip();
+		g.clip(well);
 		g.setPaint(new RadialGradientPaint(w / 2f, h * 0.5f, w * 0.62f, new float[]{0f, 1f},
 			new Color[]{Theme.alpha(Theme.mix(Theme.CARD_TOP, Theme.GOLD_DIM, 0.25), 200), Theme.alpha(Theme.INK_DEEP, 0)}));
 		g.fill(new Ellipse2D.Float(-w * 0.1f, h * 0.02f, w * 1.2f, h * 0.98f));
-		g.setClip(null);
+		g.setClip(old);
 		g.setColor(Theme.STROKE_SOFT);
 		g.draw(well);
 

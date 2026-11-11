@@ -55,10 +55,11 @@ public class LifeWarning extends JPanel
 		RoundRectangle2D shape = new RoundRectangle2D.Float(0.5f, 0.5f, w - 1, h - 1, Theme.RADIUS, Theme.RADIUS);
 		g.setPaint(new GradientPaint(0, 0, Theme.mix(Theme.CARD_TOP, Theme.BLOOD_DEEP, 0.45), w, h, Theme.mix(Theme.CARD, Theme.BLOOD_DEEP, 0.12)));
 		g.fill(shape);
-		g.setClip(shape);
+		java.awt.Shape old = g.getClip();
+		g.clip(shape);
 		g.setPaint(new GradientPaint(0, 0, Theme.EMBER, 0, h, Theme.alpha(Theme.BLOOD, 120)));
 		g.fillRect(0, 0, 3, h);
-		g.setClip(null);
+		g.setClip(old);
 		g.setColor(Theme.alpha(Theme.EMBER, 110));
 		g.draw(shape);
 		g.setColor(Theme.alpha(Color.WHITE, 12));

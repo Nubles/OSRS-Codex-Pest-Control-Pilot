@@ -102,10 +102,11 @@ class RewardRow extends JComponent
 		g.fill(shape);
 		if (inGoal)
 		{
-			g.setClip(shape);
+			java.awt.Shape old = g.getClip();
+			g.clip(shape);
 			g.setPaint(new GradientPaint(0, 0, standing.color, 0, h, Theme.alpha(standing.color, 90)));
 			g.fillRect(0, 0, 3, h);
-			g.setClip(null);
+			g.setClip(old);
 		}
 		g.setColor(hover ? Theme.alpha(Theme.GOLD, 90) : Theme.STROKE_SOFT);
 		g.draw(shape);
